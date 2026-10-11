@@ -1,0 +1,44 @@
+name: build
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Policy tests
+        run: |
+          mkdir -p build/policy-tests
+          src=app/src/main/java/io/github/zopulus/coogle
+          javac -encoding UTF-8 -d build/policy-tests \
+            $src/GateBinding.java $src/FeaturePolicy.java $src/SystemCompatibility.java \
+            $src/WalletPowerPolicy.java $src/NativeQuickEntryPolicy.java \
+            tests/GateBindingTest.java tests/FeaturePolicyTest.java tests/SystemCompatibilityTest.java \
+            tests/WalletPowerPolicyTest.java tests/NativeQuickEntryPolicyTest.java
+          for t in GateBindingTest FeaturePolicyTest SystemCompatibilityTest WalletPowerPolicyTest NativeQuickEntryPolicyTest; do
+            java -cp build/policy-tests io.github.zopulus.coogle.$t
+          done
+
+      - name: Gradle tests and release build
+        run: |
+          chmod +x gradlew
+          ./gradlew --console=plain :app:testHotwordUid :app:testWallpaper :app:testCircleGesture :app:testContextualSearch :app:testHookLifecycle :app:assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: coogle-release
+          path: app/build/outputs/apk/release/*.apk
