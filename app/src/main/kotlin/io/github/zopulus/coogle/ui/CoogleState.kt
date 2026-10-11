@@ -27,6 +27,6 @@ data class CoogleState(
     companion object {
         val featureKeys = listOf(FeaturePolicy.HEY_GOOGLE, FeaturePolicy.GMS, FeaturePolicy.GOOGLE_ENTRY,
             FeaturePolicy.NAVIGATION, FeaturePolicy.SEARCH_BAR, FeaturePolicy.LENS,
-            FeaturePolicy.WALLET, FeaturePolicy.QUICK_ENTRIES)
+            FeaturePolicy.WALLET, FeaturePolicy.QUICK_ENTRIES, FeaturePolicy.NATIVE_POWER_ASSISTANT)
     }
 }

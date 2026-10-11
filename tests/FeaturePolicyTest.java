@@ -11,6 +11,9 @@ public final class FeaturePolicyTest {
             if (!FeaturePolicy.effective(key, true, false)) throw new AssertionError("Unrelated companion requirement");
             if (FeaturePolicy.effective(key, false, true)) throw new AssertionError("Disabled integration active");
         }
+        if (FeaturePolicy.defaultValue(FeaturePolicy.NATIVE_POWER_ASSISTANT)) throw new AssertionError("Native power-key override must be opt-in");
+        if (!FeaturePolicy.effective(FeaturePolicy.NATIVE_POWER_ASSISTANT, true, false)) throw new AssertionError("Unrelated companion requirement");
+        if (FeaturePolicy.effective(FeaturePolicy.NATIVE_POWER_ASSISTANT, false, true)) throw new AssertionError("Disabled integration active");
         System.out.println("PASS: feature defaults and companion requirement");
     }
 }

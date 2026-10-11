@@ -75,7 +75,11 @@ object AssistantHooker {
             hookContextualSearch(packageName, classLoader)
         }
         hookNativeAssistantFeatureRoute(packageName, classLoader)
-        hookNativePowerLongPress(packageName, classLoader)
+        // Keep the stock ColorOS power-key channel (native Breeno launch animation) when the
+        // user opts in; corner-gesture and Circle to Search dispatch stay on the AOSP path.
+        if (!LspConfig.isNativePowerAssistantPreservedXposed()) {
+            hookNativePowerLongPress(packageName, classLoader)
+        }
         hookVoiceInteractionServiceRepair(packageName, classLoader)
     }
 }

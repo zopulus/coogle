@@ -7,4 +7,7 @@ internal object LspConfig {
     fun isAssistantNativeCircleEnabledXposed() = FeatureConfig.enabled(FeaturePolicy.NAVIGATION)
     fun isOkGoogleHotwordCompatibilityEnabledXposed() = FeatureConfig.enabled(FeaturePolicy.HEY_GOOGLE)
     fun isGmsRegionRestrictionBypassEnabledXposed() = FeatureConfig.enabled(FeaturePolicy.GMS)
+
+    /** True keeps the stock ColorOS power-key channel (native Breeno launch animation) instead of rewiring it. */
+    fun isNativePowerAssistantPreservedXposed() = FeatureConfig.enabled(FeaturePolicy.NATIVE_POWER_ASSISTANT)
 }

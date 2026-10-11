@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.DashboardCustomize
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SettingsSuggest
@@ -136,12 +137,14 @@ fun CoogleScreen(
             }
             val available = state.connected
             Group("数字助理") {
-                SettingRow(0, 3, Icons.Rounded.RecordVoiceOver, "默认数字助理", state.assistant, onClick = onAssistant)
-                ToggleRow(1, 3, Icons.Rounded.Mic, "开启 Hey Google", state.companion.summary,
+                SettingRow(0, 4, Icons.Rounded.RecordVoiceOver, "默认数字助理", state.assistant, onClick = onAssistant)
+                ToggleRow(1, 4, Icons.Rounded.Mic, "开启 Hey Google", state.companion.summary,
                     checked = state.features[FeaturePolicy.HEY_GOOGLE] == true, enabled = available && !state.busy,
                     onChange = { onSetting(FeaturePolicy.HEY_GOOGLE, it) })
-                ToggleRow(2, 3, Icons.Rounded.CenterFocusStrong, "Google智能镜头", "补全Google智能镜头功能",
+                ToggleRow(2, 4, Icons.Rounded.CenterFocusStrong, "Google智能镜头", "补全Google智能镜头功能",
                     state.features[FeaturePolicy.LENS] == true, available, { onSetting(FeaturePolicy.LENS, it) })
+                ToggleRow(3, 4, Icons.Rounded.PowerSettingsNew, "电源键长按原生小布", "电源键长按走 ColorOS 原生小布通道并保留完整动效，圈定即搜与角落手势不受影响；需重启系统界面作用域",
+                    state.features[FeaturePolicy.NATIVE_POWER_ASSISTANT] == true, available, { onSetting(FeaturePolicy.NATIVE_POWER_ASSISTANT, it) })
             }
             Group("系统设置") {
                 ToggleRow(0, 6, Icons.Rounded.TouchApp, "系统导航方式", "补全设置中的导航方式",
