@@ -45,8 +45,8 @@ final class LensBinding {
     }
 
     private static boolean isTalkConstructor(Class<?>[] p) {
-        // Google 17.67 has two flags; 17.68 adds four flags to the same controller.
-        if ((p.length != 6 && p.length != 10) || p[0].isPrimitive() || p[1].isPrimitive()
+        // Inspected Talk layouts: 17.67 has two flags, 17.68 six, and 17.70 ten.
+        if ((p.length != 6 && p.length != 10 && p.length != 14) || p[0].isPrimitive() || p[1].isPrimitive()
                 || p[2].isPrimitive() || p[p.length - 1].isPrimitive()) return false;
         for (int i = 3; i < p.length - 1; i++) if (p[i] != boolean.class) return false;
         return true;

@@ -78,12 +78,17 @@ def main():
 
     files = [local / 'libdexkit.so']
     account = ROOT / 'tests/lens-stubs/com/google/apps/tiktok/account/AccountId.java'
-    for name in ('old-event', 'new-event', 'new-layout', 'ambiguous', 'ambiguous-talk',
-                 'wrong-shape', 'wrong-talk-shape', 'unknown-talk-layout', 'missing-talk'):
+    for name in ('old-event', 'new-event', 'new-layout', 'latest-layout', 'ambiguous', 'ambiguous-talk',
+                 'wrong-shape', 'wrong-talk-shape', 'latest-wrong-talk-shape', 'unknown-talk-layout', 'missing-talk'):
         fixture = FIXTURE.replace('EVENT', '27390' if name == 'old-event' else '27507')
-        if name in ('new-layout', 'ambiguous-talk', 'wrong-talk-shape', 'unknown-talk-layout'):
+        if name in ('new-layout', 'latest-layout', 'ambiguous-talk', 'wrong-talk-shape', 'latest-wrong-talk-shape', 'unknown-talk-layout'):
             fixture = fixture.replace('boolean one, boolean two, Object state',
                                       'boolean one, boolean two, boolean three, boolean four, boolean five, boolean six, Object state')
+        if name in ('latest-layout', 'latest-wrong-talk-shape'):
+            fixture = fixture.replace('boolean six, Object state',
+                                      'boolean six, boolean seven, boolean eight, boolean nine, boolean ten, Object state')
+        if name == 'latest-wrong-talk-shape':
+            fixture = fixture.replace('boolean ten', 'int ten')
         if name == 'ambiguous-talk':
             fixture += '''class DuplicateTalk {
                 private final Anchor anchor;
