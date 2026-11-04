@@ -28,6 +28,13 @@ public final class LensBindingTest {
         boolean renamed() { return false; }
         long mode() { return 0; }
     }
+    static class CurrentTalk {
+        CurrentTalk(Object provider, Object caller, Object dependency, Object scope, boolean one, boolean two,
+                    boolean three, boolean four, boolean five, boolean six, boolean seven,
+                    boolean eight, boolean nine, boolean ten, Object state) {}
+        boolean renamed() { return false; }
+        long mode() { return 0; }
+    }
     static class WrongTalkFlag {
         WrongTalkFlag(Object provider, Object caller, Object scope, boolean one, boolean two,
                       boolean three, int four, boolean five, boolean six, Object state) {}
@@ -74,6 +81,14 @@ public final class LensBindingTest {
                 "Google 17.70 Talk layout not selected");
         check(LensBinding.isPair(create, latest) && !LensBinding.isPair(latest, create),
                 "Latest cached target order not validated");
+        Method current = CurrentTalk.class.getDeclaredMethod("renamed");
+        Method[] currentPair = LensBinding.select(List.of(wrong, current, create), Gate.class);
+        check(currentPair != null && currentPair[0].equals(create) && currentPair[1].equals(current),
+                "Google 17.72 Talk layout not selected");
+        check(LensBinding.isPair(create, current) && !LensBinding.isPair(current, create),
+                "Current cached target order not validated");
+        check(LensBinding.select(List.of(create, latest, current), Gate.class) == null,
+                "Ambiguous 17.70/17.72 Talk controllers accepted");
         check(LensBinding.select(List.of(create, updated, latest), Gate.class) == null,
                 "Ambiguous 17.68/17.70 Talk controllers accepted");
         check(LensBinding.select(List.of(create, talk, updated), Gate.class) == null,

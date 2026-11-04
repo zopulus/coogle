@@ -17,14 +17,15 @@ public final class LensDexTest {
     private static void run(String[] args) throws Exception {
         String directory = args[0];
         System.out.println("Lens DEX scanner test started");
-        for (String name : new String[]{"old-event", "new-event", "new-layout", "latest-layout", "ambiguous", "ambiguous-talk",
-                "wrong-shape", "wrong-talk-shape", "latest-wrong-talk-shape", "unknown-talk-layout", "missing-talk"}) {
+        for (String name : new String[]{"old-event", "new-event", "new-layout", "latest-layout", "current-layout", "ambiguous", "ambiguous-talk",
+                "wrong-shape", "wrong-talk-shape", "latest-wrong-talk-shape", "current-wrong-prefix",
+                "current-wrong-flag", "unknown-talk-layout", "missing-talk"}) {
             String path = directory + "/" + name + ".zip";
             ClassLoader loader = new DexClassLoader(path, directory, directory, LensDexTest.class.getClassLoader());
             try (AppDexTargets targets = new AppDexTargets(loader, path, null)) {
                 System.out.println("Scanning: " + name);
                 List<Method> methods = targets.resolve(FeaturePolicy.LENS);
-                if (name.endsWith("event") || name.equals("new-layout") || name.equals("latest-layout")) {
+                if (name.endsWith("event") || name.equals("new-layout") || name.equals("latest-layout") || name.equals("current-layout")) {
                     check(methods.size() >= 3, name + ": eligibility pair/callers missing");
                     check(methods.get(0).getDeclaringClass().getName().equals("fixture.RenamedCreate"), "Wrong create target");
                     check(methods.get(1).getDeclaringClass().getName().equals("fixture.RenamedTalk"), "Wrong talk target");
@@ -41,6 +42,7 @@ public final class LensDexTest {
         stale.setProperty("apk", "2:" + path + ":" + apk.lastModified() + ":" + apk.length());
         stale.setProperty(FeaturePolicy.LENS, "");
         stale.setProperty(FeaturePolicy.LENS + ".controllers-v2", "");
+        stale.setProperty(FeaturePolicy.LENS + ".controllers-v3", "");
         try (var output = Files.newOutputStream(cache.toPath())) { stale.store(output, "pre-fix layout miss"); }
         ClassLoader loader = new PathClassLoader(path + ":/system/framework/org.apache.http.legacy.jar", LensDexTest.class.getClassLoader());
         List<Method> found;
@@ -55,6 +57,7 @@ public final class LensDexTest {
         try (var input = Files.newInputStream(cache.toPath())) { updated.load(input); }
         check(!updated.containsKey(FeaturePolicy.LENS), "Obsolete Lens miss retained");
         check(!updated.containsKey(FeaturePolicy.LENS + ".controllers-v2"), "Obsolete 17.68 Lens miss retained");
+        check(!updated.containsKey(FeaturePolicy.LENS + ".controllers-v3"), "Obsolete 17.70 Lens miss retained");
         System.out.println("PASS: " + apk.getName() + ": " + found.get(0) + ", " + found.get(1)
                 + "; targets=" + found.size() + "; old miss replaced and cached binding validated");
     }

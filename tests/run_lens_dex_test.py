@@ -78,15 +78,23 @@ def main():
 
     files = [local / 'libdexkit.so']
     account = ROOT / 'tests/lens-stubs/com/google/apps/tiktok/account/AccountId.java'
-    for name in ('old-event', 'new-event', 'new-layout', 'latest-layout', 'ambiguous', 'ambiguous-talk',
-                 'wrong-shape', 'wrong-talk-shape', 'latest-wrong-talk-shape', 'unknown-talk-layout', 'missing-talk'):
+    for name in ('old-event', 'new-event', 'new-layout', 'latest-layout', 'current-layout', 'ambiguous', 'ambiguous-talk',
+                 'wrong-shape', 'wrong-talk-shape', 'latest-wrong-talk-shape', 'current-wrong-prefix',
+                 'current-wrong-flag', 'unknown-talk-layout', 'missing-talk'):
         fixture = FIXTURE.replace('EVENT', '27390' if name == 'old-event' else '27507')
-        if name in ('new-layout', 'latest-layout', 'ambiguous-talk', 'wrong-talk-shape', 'latest-wrong-talk-shape', 'unknown-talk-layout'):
+        if name in ('new-layout', 'latest-layout', 'ambiguous-talk', 'wrong-talk-shape', 'latest-wrong-talk-shape', 'unknown-talk-layout') or name.startswith('current-'):
             fixture = fixture.replace('boolean one, boolean two, Object state',
                                       'boolean one, boolean two, boolean three, boolean four, boolean five, boolean six, Object state')
-        if name in ('latest-layout', 'latest-wrong-talk-shape'):
+        if name in ('latest-layout', 'latest-wrong-talk-shape') or name.startswith('current-'):
             fixture = fixture.replace('boolean six, Object state',
                                       'boolean six, boolean seven, boolean eight, boolean nine, boolean ten, Object state')
+        if name.startswith('current-'):
+            fixture = fixture.replace('Object a, Object b, Object c, boolean one',
+                                      'Object a, Object b, Object dependency, Object c, boolean one')
+        if name == 'current-wrong-prefix':
+            fixture = fixture.replace('Object dependency', 'boolean dependency')
+        if name == 'current-wrong-flag':
+            fixture = fixture.replace('boolean ten', 'int ten')
         if name == 'latest-wrong-talk-shape':
             fixture = fixture.replace('boolean ten', 'int ten')
         if name == 'ambiguous-talk':
