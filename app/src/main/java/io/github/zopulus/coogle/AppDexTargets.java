@@ -58,9 +58,6 @@ final class AppDexTargets implements AutoCloseable {
             case FeaturePolicy.CAMERA_LENS -> feature + ".native-v1";
             default -> feature;
         };
-        if (!cacheKey.equals(feature) && stored.remove(feature) != null) dirty = true;
-        if (FeaturePolicy.LENS.equals(feature) && stored.remove(feature + ".controllers-v2") != null) dirty = true;
-        if (FeaturePolicy.LENS.equals(feature) && stored.remove(feature + ".controllers-v3") != null) dirty = true;
         String saved = stored.getProperty(cacheKey);
         if (saved != null) {
             if (saved.isEmpty()) return List.of();

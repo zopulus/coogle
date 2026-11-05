@@ -36,10 +36,6 @@ public final class DexTargetCacheTest {
                 try { targets.resolve(FeaturePolicy.LENS); throw new AssertionError("Google 17.70 layout miss survived the locator update"); }
                 catch (UnsatisfiedLinkError expected) { /* The revised Talk layout requires a new cache key. */ }
             }
-            Properties migrated = new Properties();
-            try (var input = Files.newInputStream(cache)) { migrated.load(input); }
-            if (migrated.containsKey(FeaturePolicy.LENS + ".controllers-v2"))
-                throw new AssertionError("Obsolete Lens layout cache retained");
 
             stale.remove(FeaturePolicy.LENS + ".controllers-v2");
             stale.setProperty(FeaturePolicy.LENS + ".controllers-v3", "");
@@ -48,14 +44,15 @@ public final class DexTargetCacheTest {
                 try { targets.resolve(FeaturePolicy.LENS); throw new AssertionError("Google 17.72 layout miss survived the locator update"); }
                 catch (UnsatisfiedLinkError expected) { /* The additional dependency requires a new cache key. */ }
             }
-            try (var input = Files.newInputStream(cache)) { migrated.clear(); migrated.load(input); }
-            if (migrated.containsKey(FeaturePolicy.LENS + ".controllers-v3"))
-                throw new AssertionError("Obsolete 17.70 Lens layout cache retained");
 
             var create = LensBindingTest.RenamedCreate.class.getDeclaredMethod("renamed");
             var talk = LensBindingTest.CurrentTalk.class.getDeclaredMethod("renamed");
             Properties stored = new Properties();
             stored.setProperty("apk", "2:" + apk + ":" + apk.toFile().lastModified() + ":" + apk.toFile().length());
+            // Obsolete entries may coexist until the APK identity changes; only the current revision is read.
+            stored.setProperty(FeaturePolicy.LENS, "");
+            stored.setProperty(FeaturePolicy.LENS + ".controllers-v2", "");
+            stored.setProperty(FeaturePolicy.LENS + ".controllers-v3", "");
             stored.setProperty(FeaturePolicy.LENS + ".controllers-v4", new DexMethod(create).serialize() + "\n" + new DexMethod(talk).serialize());
             stored.setProperty(FeaturePolicy.WALLET, "");
             stored.setProperty(FeaturePolicy.CAMERA_LENS, "");
