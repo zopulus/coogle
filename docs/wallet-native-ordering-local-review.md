@@ -118,7 +118,9 @@ assembleRelease、lintRelease 成功（0 errors、4 warnings；targetSdk、Xpose
 
 本次代码审查未发现扩大认证拦截或遗留诊断路径。修改仍在本地工作区，未推送 GitHub、改首页、更新 Release 或重启设备。
 
-## DexKit 候选定位与状态卡片更新
+## DexKit 候选定位与状态卡片更新（历史实现）
+
+2026-11-05 精简：下述候选定位只用于诊断，已从正式启动路径连同专用扫描类和缓存分支移除。钱包完整 APK 校验与已核对的认证条件继续保留；未知 APK 不安装认证 Hook，旧候选缓存也不会启用已移除的定位。
 
 新增 WalletPreviewCandidates，仅定位待审查的模型 getter 与认证回调；候选结果不授权安装认证 Hook。未知 APK 即使找到候选，也保留原始认证流程。当前已核对 APK 的适配仍由完整 SHA-256 校验独立授权，扫描错误不会导致它失效。
 

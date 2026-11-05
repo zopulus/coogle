@@ -8,7 +8,7 @@ import io.github.libxposed.api.XposedModule
 /** Entry point for the Google-related features migrated from ONextBox. */
 object MigrationEntry {
     @JvmStatic fun attach(module: XposedModule) = ModernHookRuntime.attach(module)
-    @JvmStatic fun hookWalletPreview(loader: ClassLoader, apk: String, dataDir: String) = WalletPreviewHooks.install(loader, apk, dataDir)
+    @JvmStatic fun hookWalletPreview(loader: ClassLoader, apk: String) = WalletPreviewHooks.install(loader, apk)
     @JvmStatic fun hookPackage(packageName: String, loader: ClassLoader) {
         if (packageName == "com.android.systemui") WalletKeyguardHooks.hook(loader)
         if (packageName == "com.oplus.wallpapers") {

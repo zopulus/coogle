@@ -30,8 +30,7 @@ public final class CoogleModule extends XposedModule {
         if ("com.google.android.apps.walletnfcrel".equals(packageName)) {
             if (FeatureConfig.enabled(FeaturePolicy.WALLET)) {
                 MigrationEntry.attach(this);
-                MigrationEntry.hookWalletPreview(param.getClassLoader(), param.getApplicationInfo().sourceDir,
-                        param.getApplicationInfo().dataDir);
+                MigrationEntry.hookWalletPreview(param.getClassLoader(), param.getApplicationInfo().sourceDir);
             }
             return;
         }

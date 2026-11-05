@@ -5,7 +5,6 @@ import android.app.KeyguardManager
 import android.content.Context
 import io.github.zopulus.coogle.FeatureConfig
 import io.github.zopulus.coogle.FeaturePolicy
-import io.github.zopulus.coogle.WalletPreviewCandidates
 import io.github.zopulus.coogle.migration.compat.ModernHookBridge
 import io.github.zopulus.coogle.migration.compat.ModernMethodHook
 import io.github.zopulus.coogle.migration.compat.ModernReflect
@@ -24,7 +23,7 @@ internal object WalletPreviewHooks {
     private data class Initializing(val model: Any?, val preview: Boolean)
     private val initializing = ThreadLocal<ArrayDeque<Initializing>>()
 
-    fun install(loader: ClassLoader, apk: String, dataDir: String?) {
+    fun install(loader: ClassLoader, apk: String) {
         if (!FeatureConfig.enabled(FeaturePolicy.WALLET)) return
         runCatching {
             // This authentication-sensitive binding is verified against this complete APK only.
@@ -39,13 +38,6 @@ internal object WalletPreviewHooks {
                 }
             }
             val verified = digest.digest().joinToString("") { "%02x".format(it) } == VERIFIED_APK
-            // Discovery has no authority to install a Hook; known bindings also survive a scan failure.
-            runCatching { WalletPreviewCandidates.locate(loader, apk, dataDir) }
-                .onSuccess { candidates ->
-                    val description = if (candidates.isEmpty()) "none or ambiguous" else
-                        candidates.joinToString(" -> ") { "${it.declaringClass.name}#${it.name}" }
-                    HookLog.i("WalletPreview", "DexKit review candidates: $description")
-                }.onFailure { HookLog.w("WalletPreview", "Candidate lookup unavailable", it) }
             if (!verified) {
                 HookLog.w("WalletPreview", "Unverified Wallet version; original authentication retained")
                 return

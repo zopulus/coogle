@@ -5,8 +5,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import io.github.libxposed.api.XposedInterface;
 import io.github.zopulus.coogle.FeatureConfig;
-import io.github.zopulus.coogle.WalletPreviewCandidates;
-import io.github.zopulus.coogle.WalletPreviewCandidatesTest;
 import io.github.zopulus.coogle.migration.compat.ModernHookRuntime;
 import java.lang.reflect.*;
 import java.util.*;
@@ -25,25 +23,23 @@ public final class WalletPreviewHookTest {
                 new Class<?>[]{SharedPreferences.class}, (p, m, a) -> m.getName().equals("getBoolean") ? enabled : null));
         Class<?> hooks = Class.forName("io.github.zopulus.coogle.migration.WalletPreviewHooks");
         Object instance = hooks.getField("INSTANCE").get(null);
-        hooks.getMethod("install", ClassLoader.class, String.class, String.class).invoke(instance, WalletPreviewHookTest.class.getClassLoader(), "missing.apk", null);
+        hooks.getMethod("install", ClassLoader.class, String.class).invoke(instance, WalletPreviewHookTest.class.getClassLoader(), "missing.apk");
         check(ModernHookRuntime.INSTANCE.module.callbacks.isEmpty(), "Unknown APK installed authentication hooks");
-        var directory = java.nio.file.Files.createTempDirectory("wallet-review-candidates");
+        var directory = java.nio.file.Files.createTempDirectory("wallet-unverified-apk");
         var apk = directory.resolve("base.apk");
         var cache = directory.resolve("coogle_app_targets_v1.cache");
         try {
             java.nio.file.Files.write(apk, new byte[]{1});
             var stored = new Properties();
             stored.setProperty("apk", "2:" + apk + ":" + apk.toFile().lastModified() + ":" + apk.toFile().length());
-            var state = WalletPreviewCandidatesTest.RenamedModel.class.getDeclaredMethod("renamedState");
-            var candidate = WalletPreviewCandidatesTest.RenamedCallback.class.getDeclaredMethod("renamedCallback", Object.class);
-            stored.setProperty("wallet.preview-candidates-v2", new org.luckypray.dexkit.wrap.DexMethod(state).serialize()
-                    + "\n" + new org.luckypray.dexkit.wrap.DexMethod(candidate).serialize());
-            try (var output = java.nio.file.Files.newOutputStream(cache)) { stored.store(output, "unverified candidate fixture"); }
-            check(WalletPreviewCandidates.locate(WalletPreviewHookTest.class.getClassLoader(), apk.toString(), directory.toString()).size() == 2,
-                    "Unverified APK candidate fixture not discovered");
-            hooks.getMethod("install", ClassLoader.class, String.class, String.class).invoke(instance,
-                    WalletPreviewHookTest.class.getClassLoader(), apk.toString(), directory.toString());
-            check(ModernHookRuntime.INSTANCE.module.callbacks.isEmpty(), "Discovered candidates authorized an unverified authentication Hook");
+            stored.setProperty("wallet.preview-candidates-v1", "");
+            stored.setProperty("wallet.preview-candidates-v2", "");
+            try (var output = java.nio.file.Files.newOutputStream(cache)) { stored.store(output, "retired discovery cache"); }
+            byte[] previousCache = java.nio.file.Files.readAllBytes(cache);
+            hooks.getMethod("install", ClassLoader.class, String.class).invoke(instance,
+                    WalletPreviewHookTest.class.getClassLoader(), apk.toString());
+            check(ModernHookRuntime.INSTANCE.module.callbacks.isEmpty(), "Unverified APK authorized an authentication Hook");
+            check(Arrays.equals(previousCache, java.nio.file.Files.readAllBytes(cache)), "Wallet startup still maintains diagnostic discovery caches");
         } finally {
             java.nio.file.Files.deleteIfExists(cache); java.nio.file.Files.deleteIfExists(apk); java.nio.file.Files.deleteIfExists(directory);
         }

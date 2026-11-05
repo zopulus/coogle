@@ -77,7 +77,6 @@ tasks.register('compileHookLifecycleTests', JavaCompile) {
     source files('../tests/ActionButtonLensTest.java')
     source files('../tests/RootShellTest.java')
     source files('../tests/WalletPreviewHookTest.java')
-    source files('../tests/WalletPreviewCandidatesTest.java')
     source files('../tests/ScopeRequestsTest.java')
     source files('../tests/WalletPackageIsolationTest.java')
     source files('../tests/WalletPaymentReadTest.java')
@@ -120,7 +119,6 @@ tasks.register('testHookLifecycle') {
     dependsOn 'testActionButtonLensTest'
     dependsOn 'testLensBindingTest'
     dependsOn 'testRootShell'
-    dependsOn 'testWalletPreviewCandidates'
     dependsOn 'testWalletPreviewHook'
     dependsOn 'testWalletDismissQueueTest'
     dependsOn 'testWalletKeyguardHookTest'
@@ -152,11 +150,6 @@ tasks.register('testWalletPreviewHook', JavaExec) {
     mainClass = 'WalletPreviewHookTest'
 }
 
-tasks.register('testWalletPreviewCandidates', JavaExec) {
-    dependsOn 'compileHookLifecycleTests'
-    classpath = files(lifecycleTestClasses) + tasks.named('compileHookLifecycleTests').get().classpath
-    mainClass = 'io.github.zopulus.coogle.WalletPreviewCandidatesTest'
-}
 tasks.register('compileHotwordUidTest', JavaCompile) {
     source files('../tests/HotwordUidTest.java') + fileTree('../tests/hotword-stubs') { include '**/*.java' }
     classpath = files()
