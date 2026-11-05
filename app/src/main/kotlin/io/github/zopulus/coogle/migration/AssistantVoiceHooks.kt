@@ -39,8 +39,15 @@ internal object AssistantVoiceHooks {
             "com.android.server.voiceinteraction.VoiceInteractionManagerService\$" +
                 "VoiceInteractionManagerServiceStub",
             classLoader,
-        ) ?: return
-        hookNativeAssistantSessionRecovery(packageName, cls, classLoader)
+        )
+        if (cls != null) {
+            hookNativeAssistantSessionRecovery(packageName, cls, classLoader)
+            hookVoiceServiceStart(packageName, cls)
+        }
+        hookVoiceServiceUnlock(packageName, classLoader)
+        hookAssistantRoleChanges(packageName, classLoader)
+    }
+    private fun hookVoiceServiceStart(packageName: String, cls: Class<*>) {
         val key = "$packageName:voice-interaction-service-repair:${cls.name}"
         if (!installedHooks.add(key)) return
         runCatching {
@@ -63,6 +70,8 @@ internal object AssistantVoiceHooks {
             log("Failed to hook C17 voice-interaction service restoration", it)
         }
 
+    }
+    private fun hookVoiceServiceUnlock(packageName: String, classLoader: ClassLoader) {
         val serviceClass = XposedHelpers.findClassIfExists(
             "com.android.server.voiceinteraction.VoiceInteractionManagerService",
             classLoader,
@@ -88,6 +97,8 @@ internal object AssistantVoiceHooks {
             log("Failed to restore the voice-interaction service after user unlock", it)
         }
 
+    }
+    private fun hookAssistantRoleChanges(packageName: String, classLoader: ClassLoader) {
         val roleObserverClass = XposedHelpers.findClassIfExists(
             "com.android.server.voiceinteraction.VoiceInteractionManagerService\$" +
                 "VoiceInteractionManagerServiceStub\$RoleObserver",
