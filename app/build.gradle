@@ -55,7 +55,7 @@ def contextualTestClasses = layout.buildDirectory.dir('contextual-tests')
 tasks.register('compileContextualSearchTest', JavaCompile) {
     dependsOn 'compileReleaseKotlin'
     source files('../tests/ContextualSearchTest.java') + fileTree('../tests/contextual-stubs') { include '**/*.java' }
-    classpath = files()
+    classpath = files(androidComponents.sdkComponents.bootClasspath)
     destinationDirectory = contextualTestClasses
     sourceCompatibility = '17'
     targetCompatibility = '17'
