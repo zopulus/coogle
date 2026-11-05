@@ -6,6 +6,7 @@ import static io.github.zopulus.coogle.HookInstaller.booleanMethod;
 
 final class SettingsHooks {
     static void installGoogleSettingsEntry(HookInstaller hooks, ClassLoader loader) {
+        if (!FeatureConfig.enabled(FeaturePolicy.GOOGLE_ENTRY)) return;
         try {
             Class<?> controller=target(loader,"com.oplus.settings.feature.homepage.controller.GooglePreferenceController");
             for (Method method:controller.getDeclaredMethods()) {

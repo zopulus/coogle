@@ -8,6 +8,7 @@ import static io.github.zopulus.coogle.HookInstaller.booleanMethod;
 
 final class SearchBarHooks {
     static void install(HookInstaller hooks, ClassLoader loader) {
+        if (!FeatureConfig.enabled(FeaturePolicy.SEARCH_BAR)) return;
         int firstHandle = hooks.mark();
         try {
             Class<?> feature=target(loader,"com.android.common.config.FeatureOption");

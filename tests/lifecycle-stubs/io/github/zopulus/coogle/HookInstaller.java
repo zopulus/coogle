@@ -9,6 +9,12 @@ public class HookInstaller {
     public static Class<?> target(ClassLoader loader, String name) throws ClassNotFoundException {
         return Class.forName(name, false, loader);
     }
+    public static java.lang.reflect.Method booleanMethod(Class<?> type, String name) throws NoSuchMethodException {
+        var method = type.getDeclaredMethod(name);
+        if (method.getReturnType() != boolean.class || !java.lang.reflect.Modifier.isStatic(method.getModifiers()))
+            throw new NoSuchMethodException(type.getName() + "." + name + " incompatible signature");
+        return method;
+    }
     public int installed;
     public XposedInterface.Hooker callback;
     public final Map<Executable,XposedInterface.Hooker> callbacks = new LinkedHashMap<>();
