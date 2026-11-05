@@ -21,14 +21,14 @@ internal object ModernReflect {
         Class.forName(name, false, classLoader)
 
     fun getObjectField(target: Any, fieldName: String): Any? =
-        findField(target.javaClass, fieldName).read(target)
+        findField(target.javaClass, fieldName).get(target)
 
     fun setObjectField(target: Any, fieldName: String, value: Any?) {
-        findField(target.javaClass, fieldName).write(target, value)
+        findField(target.javaClass, fieldName).set(target, value)
     }
 
     fun getStaticIntField(targetClass: Class<*>, fieldName: String): Int =
-        findField(targetClass, fieldName).read(null) as Int
+        findField(targetClass, fieldName).get(null) as Int
 
     fun callMethod(target: Any?, methodName: String, vararg args: Any?): Any? {
         val receiver = requireNotNull(target) { "Receiver is null for $methodName" }
@@ -147,16 +147,6 @@ internal object ModernReflect {
             current = current.superclass
         }
         throw NoSuchFieldException("${targetClass.name}#$fieldName")
-    }
-
-    private fun Field.read(receiver: Any?): Any? {
-        isAccessible = true
-        return get(receiver)
-    }
-
-    private fun Field.write(receiver: Any?, value: Any?) {
-        isAccessible = true
-        set(receiver, value)
     }
 
     private fun compatibilityScore(
