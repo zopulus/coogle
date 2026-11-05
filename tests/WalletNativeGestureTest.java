@@ -4,6 +4,7 @@ import java.io.IOException;
 
 public final class WalletNativeGestureTest {
     public static void main(String[] args) throws Exception {
+        rootFailureRollback();
         Fake driver = new Fake();
         var original = driver.current;
         WalletNativeGesture gesture = new WalletNativeGesture(10, driver, driver);
@@ -84,9 +85,30 @@ public final class WalletNativeGestureTest {
         }
         System.out.println("PASS: native enable/disable, prior-state backup, external changes, rollback and unsupported route");
     }
+    private static void rootFailureRollback() throws Exception {
+        for (RootShell.Reason reason : RootShell.Reason.values()) {
+            for (boolean enabled : new boolean[]{false, true}) {
+                Fake driver = new Fake();
+                var gesture = new WalletNativeGesture(10, driver, driver);
+                if (!enabled) gesture.apply(true);
+                var before = driver.current;
+                var saved = driver.original;
+                int writes = driver.nativeWrites;
+                RootShell.Failure failure = new RootShell.Failure(reason);
+                driver.rootFailure = failure;
+                try { gesture.apply(enabled); throw new AssertionError("Root failure accepted"); }
+                catch (RootShell.Failure expected) { check(expected == failure, "Original failure replaced"); }
+                boolean notStarted = reason == RootShell.Reason.AUTHORIZATION || reason == RootShell.Reason.UNAVAILABLE;
+                check(driver.nativeWrites - writes == (notStarted ? 1 : 2), "Wrong rollback count: " + reason);
+                check(driver.current.equals(before), "Native state changed after failed write: " + reason);
+                check(java.util.Objects.equals(driver.original, saved), "Backup not restored: " + reason);
+            }
+        }
+    }
     static final class Fake implements WalletNativeGesture.Shell, WalletNativeGesture.Backup {
         WalletNativeGesture.State current = new WalletNativeGesture.State("0", "null"), original;
-        boolean failWrite, failBackup, ignoreWrite, support = true; int calls, failedWritesRemaining;
+        boolean failWrite, failBackup, ignoreWrite, support = true; int calls, failedWritesRemaining, nativeWrites;
+        RootShell.Failure rootFailure;
         public WalletNativeGesture.State read() { return original; }
         public boolean write(WalletNativeGesture.State value) {
             original = value;
@@ -99,6 +121,13 @@ public final class WalletNativeGestureTest {
             for (var state : new WalletNativeGesture.State[]{new WalletNativeGesture.State("1", "1"), new WalletNativeGesture.State("0", "null"),
                     new WalletNativeGesture.State("1", "0"), new WalletNativeGesture.State("null", "null")}) {
                 if (command.equals(WalletNativeGesture.writeCommand(10, state))) {
+                    nativeWrites++;
+                    if (rootFailure != null) {
+                        var failure = rootFailure; rootFailure = null;
+                        if (failure.reason == RootShell.Reason.TIMEOUT || failure.reason == RootShell.Reason.EXECUTION)
+                            current = new WalletNativeGesture.State(current.enabled(), state.action());
+                        throw failure;
+                    }
                     if (ignoreWrite) { ignoreWrite = false; break; }
                     if (failedWritesRemaining > 0) { failedWritesRemaining--; throw new IOException("Persistent write failure"); }
                     if (failWrite) { failWrite = false; current = new WalletNativeGesture.State(current.enabled(), state.action()); throw new IOException("Write failed"); }

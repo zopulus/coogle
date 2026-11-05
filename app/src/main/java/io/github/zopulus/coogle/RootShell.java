@@ -21,6 +21,9 @@ final class RootShell {
             this.reason = reason;
         }
     }
+    static boolean commandNotStarted(Throwable failure) {
+        return failure instanceof Failure root && (root.reason == Reason.AUTHORIZATION || root.reason == Reason.UNAVAILABLE);
+    }
     static String run(String command, int timeout) throws Exception {
         Process process;
         try {

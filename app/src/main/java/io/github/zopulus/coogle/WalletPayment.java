@@ -18,13 +18,18 @@ final class WalletPayment implements WalletSettings.Payment {
     private static final String GMS = "com.google.android.gms";
     private static final String DEFAULT = "nfc_payment_default_component";
     private final Context context;
+    interface Shell { String run(String command) throws Exception; }
+    private final Shell shell;
     // Android's UserHandle.PER_USER_RANGE.
-    private final int user = Process.myUid() / 100000;
-    WalletPayment(Context context) { this.context = context; }
+    private final int user;
+    WalletPayment(Context context) { this(context, Process.myUid() / 100000, command -> RootShell.run(command, 20)); }
+    WalletPayment(Context context, int user, Shell shell) {
+        this.context = context; this.user = user; this.shell = shell;
+    }
     interface ReadSetting { String read() throws Exception; }
     private String current() throws Exception {
         return readCurrent(() -> Settings.Secure.getString(context.getContentResolver(), DEFAULT),
-                () -> RootShell.run(readCommand(user), 20));
+                () -> shell.run(readCommand(user)));
     }
     static String readCurrent(ReadSetting direct, ReadSetting privileged) throws Exception {
         try { return direct.read(); }
@@ -66,14 +71,15 @@ final class WalletPayment implements WalletSettings.Payment {
         String previous = current();
         RoleManager roles = context.getSystemService(RoleManager.class);
         boolean useRole = roles != null && roles.isRoleAvailable(RoleManager.ROLE_WALLET);
-        String oldHolder = useRole ? RootShell.run("cmd role get-role-holders --user " + user
-                + " " + RoleManager.ROLE_WALLET, 20).trim() : "";
+        String oldHolder = useRole ? shell.run("cmd role get-role-holders --user " + user
+                + " " + RoleManager.ROLE_WALLET).trim() : "";
         if (!oldHolder.isEmpty() && !oldHolder.matches("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+"))
             throw new IOException("无法读取系统默认钱包，未更改付款设置。");
         String component = useRole ? null : paymentService();
-        WalletSettings.Undo undo = () -> RootShell.run(restoreCommand(user, previous, useRole, oldHolder), 20);
-        try { RootShell.run(selectionCommand(user, useRole, component), 20); }
+        WalletSettings.Undo undo = () -> shell.run(restoreCommand(user, previous, useRole, oldHolder));
+        try { shell.run(selectionCommand(user, useRole, component)); }
         catch (Exception failure) {
+            if (RootShell.commandNotStarted(failure)) throw failure;
             try { undo.restore(); }
             catch (Exception rollback) { if (rollback != failure) failure.addSuppressed(rollback); }
             throw failure;

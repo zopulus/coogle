@@ -66,8 +66,8 @@ final class WalletNativeGesture implements WalletSettings.Gesture {
             if (changedNative) { writeStarted = true; write(next); }
             if (changedBackup && nextBackup == null) saveBackup(null);
         } catch (Exception failure) {
-            boolean restored = !writeStarted;
-            if (writeStarted) {
+            boolean restored = !writeStarted || RootShell.commandNotStarted(failure);
+            if (!restored) {
                 try { write(before); restored = true; }
                 catch (Exception rollback) { if (rollback != failure) failure.addSuppressed(rollback); }
             }
