@@ -52,22 +52,70 @@ public class HiddenCircleNoAssistantTest {
         check(search.calls==3,"Corner assistant was redirected to search");
         ServiceManager.current=null; invoke(hook,method,manager,8,1);
         check(search.calls==3,"Unavailable service counted as success");
-        for(String name:List.of("nativeAssistantRouteDepth","nativeAssistantRouteFrames")) {
-            Field field=owner.getDeclaredField(name); field.setAccessible(true);
-            check(((ThreadLocal<?>)field.get(owner.getField("INSTANCE").get(null))).get()==null,"Route state leaked: "+name);
-        }
+        verifyNestedRoutes(hook,method,manager);
+        Field frames=owner.getDeclaredField("nativeAssistantRouteFrames"); frames.setAccessible(true);
+        check(((ThreadLocal<?>)frames.get(owner.getField("INSTANCE").get(null))).get()==null,"Route frames leaked");
         check(Binder.cleared==Binder.restored,"Calling identity leaked");
-        System.out.println("PASS: no-assistant circle 8/1000, selected assistant, lock task, switches, corner, missing service and route cleanup");
+        System.out.println("PASS: native circle, switches, lock task, nested route scope, thread isolation and exception cleanup");
     }
     static void invoke(XposedInterface.Hooker hook,Method method,AssistManager manager,int type,int expectedProceed) throws Throwable {
+        invoke(hook,method,manager,type,expectedProceed,() -> {});
+    }
+    interface NativeCall { void run() throws Throwable; }
+    static void invoke(XposedInterface.Hooker hook,Method method,AssistManager manager,int type,int expectedProceed,NativeCall nativeCall) throws Throwable {
         Bundle bundle=new Bundle(); bundle.putInt("invocation_type",type); int[] nativeCalls={0};
         XposedInterface.Chain chain=(XposedInterface.Chain)Proxy.newProxyInstance(XposedInterface.Chain.class.getClassLoader(),new Class<?>[]{XposedInterface.Chain.class},(p,m,a)->switch(m.getName()) {
             case "getExecutable" -> method; case "getThisObject" -> manager; case "getArgs" -> List.of(bundle);
-            case "proceed" -> {nativeCalls[0]++;yield null;}
+            case "proceed" -> {nativeCalls[0]++;nativeCall.run();yield null;}
             default -> throw new AssertionError("Unexpected chain access: "+m.getName());
         });
         hook.intercept(chain);
         check(nativeCalls[0]==expectedProceed,"Unexpected native dispatch for type="+type+": "+nativeCalls[0]);
+    }
+    static void verifyNestedRoutes(XposedInterface.Hooker hook,Method method,AssistManager manager) throws Throwable {
+        check(!regionEnabled(),"Region override escaped assistant invocation");
+        invoke(hook,method,manager,8,1,() -> {
+            check(regionEnabled(),"Enabled outer route not visible");
+            invoke(hook,method,manager,0,1,() -> check(regionEnabled(),"Disabled inner route hid enabled outer route"));
+            check(regionEnabled(),"Inner exit cleared enabled outer route");
+            var error=new IllegalStateException("native assistant failed");
+            try {
+                invoke(hook,method,manager,8,1,() -> { throw error; });
+                throw new AssertionError("Native failure swallowed");
+            } catch(IllegalStateException expected) { check(expected==error,"Native failure changed"); }
+            check(regionEnabled(),"Inner exception cleared enabled outer route");
+            var threadFailure=new java.util.concurrent.atomic.AtomicReference<Throwable>();
+            Thread other=new Thread(() -> {
+                try { check(!regionEnabled(),"Route state leaked between threads"); }
+                catch(Throwable failure) { threadFailure.set(failure); }
+            });
+            other.start(); other.join(2000);
+            check(!other.isAlive(),"Thread isolation check did not finish");
+            if(threadFailure.get()!=null) throw threadFailure.get();
+        });
+        check(!regionEnabled(),"Outer exit left region override enabled");
+        invoke(hook,method,manager,0,1,() -> {
+            check(!regionEnabled(),"Disabled outer route enabled region override");
+            invoke(hook,method,manager,8,1,() -> check(regionEnabled(),"Enabled inner route not visible"));
+            check(!regionEnabled(),"Inner exit enabled disabled outer route");
+        });
+        var error=new IllegalStateException("outer native failure");
+        try {
+            invoke(hook,method,manager,8,1,() -> { throw error; });
+            throw new AssertionError("Outer native failure swallowed");
+        } catch(IllegalStateException expected) { check(expected==error,"Outer native failure changed"); }
+        check(!regionEnabled(),"Outer exception leaked region override");
+    }
+    static boolean regionEnabled() throws Throwable {
+        Method method=com.oplusos.systemui.common.feature.FeatureOption.class.getMethod("isExpRegion");
+        XposedInterface.Hooker hook=ModernHookRuntime.INSTANCE.module.callbacks.get(method);
+        check(hook!=null,"Region gate hook missing");
+        var chain=(XposedInterface.Chain)Proxy.newProxyInstance(XposedInterface.Chain.class.getClassLoader(),new Class<?>[]{XposedInterface.Chain.class},(p,m,a)->switch(m.getName()) {
+            case "getExecutable" -> method; case "getThisObject" -> null; case "getArgs" -> List.of();
+            case "proceed" -> false;
+            default -> throw new AssertionError("Unexpected gate access: "+m.getName());
+        });
+        return (Boolean)hook.intercept(chain);
     }
     static void check(boolean yes,String message){if(!yes)throw new AssertionError(message);}
 }

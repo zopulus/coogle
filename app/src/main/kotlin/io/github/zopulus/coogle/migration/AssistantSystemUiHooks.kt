@@ -160,11 +160,9 @@ internal object AssistantSystemUiHooks {
                                 val enabled = isEnabledNativeInvocation(param.args.firstOrNull())
                                 val frames = nativeAssistantRouteFrames.get()
                                     ?: ArrayDeque<Boolean>().also(nativeAssistantRouteFrames::set)
-                                frames.addLast(enabled)
+                                // A disabled inner call still runs within an enabled outer route.
+                                frames.addLast(enabled || frames.peekLast() == true)
                                 if (!enabled) return
-                                nativeAssistantRouteDepth.set(
-                                    (nativeAssistantRouteDepth.get() ?: 0) + 1,
-                                )
                                 val bundle = param.args.firstOrNull() as? Bundle ?: return
                                 val type = bundle.getInt("invocation_type", 0)
                                 if (type != INVOCATION_TYPE_CIRCLE_TO_SEARCH &&
@@ -181,15 +179,8 @@ internal object AssistantSystemUiHooks {
 
                             override fun afterHookedMethod(param: MethodHookParam) {
                                 val frames = nativeAssistantRouteFrames.get() ?: return
-                                val enabled = frames.pollLast() ?: false
+                                frames.pollLast()
                                 if (frames.isEmpty()) nativeAssistantRouteFrames.remove()
-                                if (!enabled) return
-                                val nextDepth = (nativeAssistantRouteDepth.get() ?: 1) - 1
-                                if (nextDepth > 0) {
-                                    nativeAssistantRouteDepth.set(nextDepth)
-                                } else {
-                                    nativeAssistantRouteDepth.remove()
-                                }
                             }
                         },
                     )
@@ -213,7 +204,7 @@ internal object AssistantSystemUiHooks {
                 "isExpRegion",
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        if ((nativeAssistantRouteDepth.get() ?: 0) > 0) {
+                        if (nativeAssistantRouteFrames.get()?.peekLast() == true) {
                             param.result = true
                         }
                     }
@@ -358,6 +349,5 @@ internal object AssistantSystemUiHooks {
             log("Failed to install SystemUI assistant retry", it)
         }
     }
-    private val nativeAssistantRouteDepth = ThreadLocal<Int>()
     private val nativeAssistantRouteFrames = ThreadLocal<ArrayDeque<Boolean>>()
 }
