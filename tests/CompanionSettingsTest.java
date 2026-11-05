@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class CompanionSettingsTest {
     public static void main(String[] args) throws Exception {
+        rootFailureRollback();
         concurrentSaveAndResume();
         Prefs prefs = new Prefs(); Support support = new Support();
         check(!CompanionSettings.shouldCheck(prefs.api),"First open requested unsolicited root checks");
@@ -65,6 +66,30 @@ public final class CompanionSettingsTest {
         check(prefs.commits == commits, "Matching automatic sync rewrote preferences");
         System.out.println("PASS: serialized settings, update choice preservation, install intent, known-state detection and rollback");
     }
+    private static void rootFailureRollback() throws Exception {
+        for (boolean previous : new boolean[]{false, true}) {
+            for (RootShell.Reason reason : RootShell.Reason.values()) {
+                Prefs prefs = new Prefs();
+                prefs.values.put(FeaturePolicy.HEY_GOOGLE, previous);
+                prefs.values.put("companion_ready", true);
+                prefs.values.put("companion_known", true);
+                Map<String, Boolean> saved = new HashMap<>(prefs.values);
+                Support support = new Support(); support.enabled = previous;
+                RootShell.Failure failure = new RootShell.Failure(reason);
+                support.setFailure = failure;
+                try {
+                    new CompanionSettings(support).save(prefs.api, !previous);
+                    throw new AssertionError("Root failure accepted: " + reason);
+                } catch (RootShell.Failure expected) {
+                    check(expected == failure, "Original Root failure replaced");
+                }
+                boolean notExecuted = reason == RootShell.Reason.AUTHORIZATION || reason == RootShell.Reason.UNAVAILABLE;
+                check(support.sets == (notExecuted ? 1 : 2), "Wrong rollback attempts for " + reason + ": " + support.sets);
+                check(support.enabled == previous, "Partial Root modification not restored: " + reason);
+                check(prefs.commits == 0 && prefs.values.equals(saved), "Root failure rewrote preferences: " + reason);
+            }
+        }
+    }
     private static void concurrentSaveAndResume() throws Exception {
         Prefs prefs = new Prefs(); prefs.values.put(FeaturePolicy.HEY_GOOGLE, true);
         Support support = new Support(); support.pause = true;
@@ -84,10 +109,17 @@ public final class CompanionSettingsTest {
         String installState = "PENDING";
         volatile boolean enabled = true;
         boolean pause; int sets;
+        RootShell.Failure setFailure;
         final CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1), synced = new CountDownLatch(1);
         public String check() { synced.countDown(); return state; }
         public String set(boolean enabled) throws Exception {
             sets++;
+            if (setFailure != null) {
+                RootShell.Failure failure = setFailure; setFailure = null;
+                if (failure.reason == RootShell.Reason.TIMEOUT || failure.reason == RootShell.Reason.EXECUTION)
+                    this.enabled = enabled;
+                throw failure;
+            }
             if (!state.equals("MISSING") && !state.equals("UPDATE_REQUIRED")) this.enabled = enabled;
             if (pause) { pause = false; entered.countDown(); CompanionSettingsTest.check(release.await(2, TimeUnit.SECONDS), "Save release timed out"); }
             return state;
