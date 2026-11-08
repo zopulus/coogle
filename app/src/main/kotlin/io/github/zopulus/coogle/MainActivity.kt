@@ -31,8 +31,9 @@ class MainActivity : ComponentActivity() {
         // Preserve request order when an Activity is destroyed/recreated with work pending.
         private val worker = Executors.newSingleThreadExecutor()
         private val settingsWorker = Executors.newSingleThreadExecutor()
+        // Main-thread state survives Activity recreation together with the queued saves.
+        private var savingKeys by mutableStateOf(emptySet<String>())
     }
-    private val savingKeys = mutableSetOf<String>()
     private var preferences: SharedPreferences? = null
     private var companionCheckedThisResume = false
     private val main = Handler(Looper.getMainLooper())
@@ -66,7 +67,7 @@ class MainActivity : ComponentActivity() {
         main.postDelayed(connectionTimeout, 700)
         setContent {
             CoogleTheme {
-                CoogleScreen(state, ::changeSetting, ::openAssistant, ::changeIconVisibility,
+                CoogleScreen(state, savingKeys, ::changeSetting, ::openAssistant, ::changeIconVisibility,
                     { showDialog(DialogKind.STATUS); if (state.connected == true) checkCompanion() }, ::openRepository,
                     ::confirmDialog, ::dismissDialog,
                     { showDialog(DialogKind.RESTART) })
@@ -116,14 +117,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun refreshKnownCompanion() {
-        if (state.scopePending) return
+        if (state.scopePending || companionCheckedThisResume) return
         val settings = preferences ?: return
         if (state.companion != CompanionState.UNKNOWN ||
             runCatching { CompanionSettings.shouldCheck(settings) }.getOrDefault(false)) checkCompanion()
     }
 
     private fun changeSetting(key: String, enabled: Boolean) {
-        if (state.connected != true || state.scopePending || preferences == null || key in savingKeys) return
+        if (state.connected != true || state.scopePending || state.restarting || preferences == null || key in savingKeys) return
         if (key == FeaturePolicy.HEY_GOOGLE && (state.busy || !state.heyAvailable)) return
         if (state.features[key] == enabled) return
         if (enabled) SettingsConnection.requestScopes(key)
@@ -144,7 +145,8 @@ class MainActivity : ComponentActivity() {
 
     private fun saveSetting(key: String, enabled: Boolean) {
         val settings = preferences ?: return
-        if (!savingKeys.add(key)) return
+        if (key in savingKeys) return
+        savingKeys += key
         val executor = if (key == FeaturePolicy.HEY_GOOGLE || key == FeaturePolicy.WALLET) worker else settingsWorker
         executor.execute {
             var supportState: CompanionState? = null
@@ -160,8 +162,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
             runOnUiThread {
+                savingKeys -= key
                 if (isDestroyed) return@runOnUiThread
-                savingKeys.remove(key)
                 result.onSuccess {
                     syncPreferences()
                     if (supportState != null) confirmCompanion(supportState)
@@ -173,7 +175,6 @@ class MainActivity : ComponentActivity() {
     private fun checkCompanion() {
         val settings = preferences ?: return
         if (state.busy || state.companionChecking || state.scopePending) return
-        if (companionCheckedThisResume) return
         companionCheckedThisResume = true
         state = state.copy(companionChecking = true)
         worker.execute {
@@ -228,8 +229,11 @@ class MainActivity : ComponentActivity() {
     private fun restartScopes() {
         if (state.restarting || state.busy || state.scopePending) return
         state = state.copy(restarting = true)
+        // Capture all ordinary saves already queued, including those from a destroyed Activity.
+        val pendingSettings = settingsWorker.submit { }
         worker.execute {
             val result = runCatching {
+                pendingSettings.get()
                 val command = ScopeRestart.command(SettingsConnection.currentScope(), android.os.Process.myUid() / 100000)
                 RootShell.run(command, 20)
             }

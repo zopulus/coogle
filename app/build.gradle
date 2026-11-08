@@ -117,6 +117,7 @@ tasks.register('compileHookLifecycleTests', JavaCompile) {
     }
 }
 tasks.register('testHookLifecycle') {
+    dependsOn 'testSettingsActivity'
     dependsOn 'testAssistantVoiceInstallTest'
     dependsOn 'testOptionalAppHooksTest'
     dependsOn 'testActionButtonLensTest'
@@ -139,6 +140,23 @@ tasks.register('testHookLifecycle') {
     dependsOn 'testCompanionControlTest'
     dependsOn 'testCompanionSettingsTest'
     dependsOn 'testDexTargetCacheTest', 'testLensHookLifecycleTest', 'testSignalModelHookLifecycleTest', 'testRoleReconciliationTest', 'testHookInstallRollbackTest', 'testHiddenCircleNoAssistantTest', 'testFeatureQueryTest', 'testContextBindingCacheTest'
+}
+
+// Keep Activity boundaries isolated from the hook lifecycle fixtures.
+def activityTestClasses = layout.buildDirectory.dir('activity-tests')
+tasks.register('compileSettingsActivityTest', JavaCompile) {
+    dependsOn 'compileHookLifecycleTests'
+    source files('../tests/SettingsActivityTest.java') + fileTree('../tests/activity-stubs') { include '**/*.java' }
+    classpath = files(lifecycleTestClasses) + tasks.named('compileHookLifecycleTests').get().classpath
+    destinationDirectory = activityTestClasses
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+    options.encoding = 'UTF-8'
+}
+tasks.register('testSettingsActivity', JavaExec) {
+    dependsOn 'compileSettingsActivityTest'
+    classpath = files(activityTestClasses) + tasks.named('compileSettingsActivityTest').get().classpath
+    mainClass = 'io.github.zopulus.coogle.SettingsActivityTest'
 }
 
 tasks.register('testRootShell', JavaExec) {

@@ -74,6 +74,7 @@ import io.github.zopulus.coogle.R
 @Composable
 fun CoogleScreen(
     state: CoogleState,
+    savingKeys: Set<String>,
     onSetting: (String, Boolean) -> Unit,
     onAssistant: () -> Unit,
     onIconVisibility: (Boolean) -> Unit,
@@ -96,7 +97,7 @@ fun CoogleScreen(
                 collapsedHeight = TopAppBarDefaults.LargeAppBarCollapsedHeight,
                 expandedHeight = TopAppBarDefaults.LargeFlexibleAppBarWithSubtitleExpandedHeight,
                 actions = {
-                    val enabled = state.connected == true && !state.busy && !state.restarting && !state.scopePending
+                    val enabled = state.connected == true && !state.busy && !state.restarting && !state.scopePending && savingKeys.isEmpty()
                     IconButton(onClick = onRestart, enabled = enabled) {
                         ControlIcon(ControlIcons.Restart, "重启作用域", enabled)
                     }
@@ -154,30 +155,30 @@ fun CoogleScreen(
                     }
                 )
             }
-            val available = state.connected == true && !state.scopePending
+            val available = state.connected == true && !state.scopePending && !state.restarting
             Group("数字助理") {
                 SettingRow(0, 3, Icons.Rounded.RecordVoiceOver, "默认数字助理", state.assistant, onClick = onAssistant)
                 ToggleRow(1, 3, Icons.Rounded.Mic, "Hey Google", state.heyDescription,
                     checked = state.features[FeaturePolicy.HEY_GOOGLE], enabled = available && !state.busy && state.heyAvailable,
-                    onChange = { onSetting(FeaturePolicy.HEY_GOOGLE, it) })
+                    onChange = { onSetting(FeaturePolicy.HEY_GOOGLE, it) }, saving = FeaturePolicy.HEY_GOOGLE in savingKeys)
                 ToggleRow(2, 3, ImageVector.vectorResource(R.drawable.action_lens_color), "Google智能镜头", "补全Google智能镜头功能",
-                    state.features[FeaturePolicy.LENS], available, { onSetting(FeaturePolicy.LENS, it) })
+                    state.features[FeaturePolicy.LENS], available, { onSetting(FeaturePolicy.LENS, it) }, FeaturePolicy.LENS in savingKeys)
             }
             Group("系统设置") {
                 ToggleRow(0, 7, Icons.Rounded.TouchApp, "系统导航方式", state.navigationDescription,
-                    state.features[FeaturePolicy.NAVIGATION], available, { onSetting(FeaturePolicy.NAVIGATION, it) })
+                    state.features[FeaturePolicy.NAVIGATION], available, { onSetting(FeaturePolicy.NAVIGATION, it) }, FeaturePolicy.NAVIGATION in savingKeys)
                 ToggleRow(1, 7, Icons.Rounded.Search, "Google搜索框", "在桌面底部显示 Google 搜索框",
-                    state.features[FeaturePolicy.SEARCH_BAR], available, { onSetting(FeaturePolicy.SEARCH_BAR, it) })
+                    state.features[FeaturePolicy.SEARCH_BAR], available, { onSetting(FeaturePolicy.SEARCH_BAR, it) }, FeaturePolicy.SEARCH_BAR in savingKeys)
                 ToggleRow(2, 7, ControlIcons.ActionButton, "快捷键智能镜头", "将快捷键中AI拍一拍替换为智能镜头",
-                    state.features[FeaturePolicy.ACTION_BUTTON_LENS], available, { onSetting(FeaturePolicy.ACTION_BUTTON_LENS, it) })
+                    state.features[FeaturePolicy.ACTION_BUTTON_LENS], available, { onSetting(FeaturePolicy.ACTION_BUTTON_LENS, it) }, FeaturePolicy.ACTION_BUTTON_LENS in savingKeys)
                 ToggleRow(3, 7, Icons.Rounded.AccountBalanceWallet, "Google钱包", "息屏时双击电源键呼出Google钱包",
-                    state.features[FeaturePolicy.WALLET], available, { onSetting(FeaturePolicy.WALLET, it) })
+                    state.features[FeaturePolicy.WALLET], available, { onSetting(FeaturePolicy.WALLET, it) }, FeaturePolicy.WALLET in savingKeys)
                 ToggleRow(4, 7, Icons.Rounded.DashboardCustomize, "快捷入口与控制中心", "补全锁屏快捷入口与下拉控制中心的原生开关",
-                    state.features[FeaturePolicy.QUICK_ENTRIES], available, { onSetting(FeaturePolicy.QUICK_ENTRIES, it) })
+                    state.features[FeaturePolicy.QUICK_ENTRIES], available, { onSetting(FeaturePolicy.QUICK_ENTRIES, it) }, FeaturePolicy.QUICK_ENTRIES in savingKeys)
                 ToggleRow(5, 7, Icons.Rounded.LockOpen, "移除 GMS 使用限制", "移除国行 GMS 限制标记",
-                    state.features[FeaturePolicy.GMS], available, { onSetting(FeaturePolicy.GMS, it) })
+                    state.features[FeaturePolicy.GMS], available, { onSetting(FeaturePolicy.GMS, it) }, FeaturePolicy.GMS in savingKeys)
                 ToggleRow(6, 7, Icons.Rounded.SettingsSuggest, "设置底部显示 Google", "强制显示设置底部Google",
-                    state.features[FeaturePolicy.GOOGLE_ENTRY], available, { onSetting(FeaturePolicy.GOOGLE_ENTRY, it) })
+                    state.features[FeaturePolicy.GOOGLE_ENTRY], available, { onSetting(FeaturePolicy.GOOGLE_ENTRY, it) }, FeaturePolicy.GOOGLE_ENTRY in savingKeys)
             }
             Group("其他设置") {
                 ToggleRow(0, 2, Icons.Rounded.VisibilityOff, "隐藏桌面图标", "隐藏后，可从 LSPosed 中打开",
@@ -187,7 +188,7 @@ fun CoogleScreen(
             Spacer(Modifier.height(24.dp))
         }
     }
-    CoogleDialog(state, onDialogConfirm, onDialogDismiss)
+    CoogleDialog(state, savingKeys.isNotEmpty(), onDialogConfirm, onDialogDismiss)
 }
 
 @Composable
@@ -229,9 +230,11 @@ private fun SettingRow(index: Int, count: Int, icon: ImageVector, title: String,
 
 @Composable
 private fun ToggleRow(index: Int, count: Int, icon: ImageVector, title: String, summary: String,
-    checked: Boolean?, enabled: Boolean, onChange: (Boolean) -> Unit) {
-    SettingRow(index, count, icon, title, summary, { if (checked != null) onChange(!checked) }, enabled && checked != null,
-        Modifier.semantics { role = Role.Switch; stateDescription = when (checked) { true -> "已开启"; false -> "已关闭"; null -> "正在读取" } }) {
+    checked: Boolean?, enabled: Boolean, onChange: (Boolean) -> Unit, saving: Boolean = false) {
+    SettingRow(index, count, icon, title, if (saving) "正在保存…" else summary,
+        { if (checked != null) onChange(!checked) }, enabled && checked != null && !saving,
+        Modifier.semantics { role = Role.Switch; stateDescription = if (saving) "正在保存" else
+            when (checked) { true -> "已开启"; false -> "已关闭"; null -> "正在读取" } }) {
         if (checked == null) {
             Box(Modifier.size(width = 52.dp, height = 32.dp).background(
                 MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(16.dp)))
@@ -240,7 +243,7 @@ private fun ToggleRow(index: Int, count: Int, icon: ImageVector, title: String, 
         Switch(
             checked = checked,
             onCheckedChange = null,
-            enabled = enabled,
+            enabled = enabled && !saving,
             thumbContent = if (checked || enabled) {
                 { Icon(if (checked) Icons.Rounded.Check else Icons.Rounded.Close, null, Modifier.size(SwitchDefaults.IconSize)) }
             } else null,
@@ -252,7 +255,7 @@ private fun ToggleRow(index: Int, count: Int, icon: ImageVector, title: String, 
 }
 
 @Composable
-private fun CoogleDialog(state: CoogleState, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+private fun CoogleDialog(state: CoogleState, saving: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     if (state.dialog == DialogKind.NONE) return
     val title = when (state.dialog) {
         DialogKind.STATUS -> "模块状态"
@@ -295,6 +298,7 @@ private fun CoogleDialog(state: CoogleState, onConfirm: () -> Unit, onDismiss: (
         },
         confirmButton = {
             TextButton(onClick = onConfirm, enabled = !state.busy && !state.restarting &&
+                (state.dialog != DialogKind.RESTART || !saving) &&
                 (state.dialog != DialogKind.STATUS || (state.connected == true && !state.scopePending && !state.companionChecking))) { Text(confirm) }
         },
         dismissButton = if (state.dialog in setOf(DialogKind.STATUS, DialogKind.RESTART, DialogKind.HIDE_ICON)) {
