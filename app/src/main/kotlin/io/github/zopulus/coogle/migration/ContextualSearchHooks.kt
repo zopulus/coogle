@@ -32,8 +32,7 @@ internal object ContextualSearchHooks {
                 XposedHelpers.findAndHookMethod(
                     cls,
                     "deviceHasConfigString",
-                    Context::class.java,
-                    Int::class.javaPrimitiveType,
+                    arrayOf(Context::class.java, Integer.TYPE),
                     object : XC_MethodHook() {
                         override fun beforeHookedMethod(param: MethodHookParam) {
                             if (!isCircleFeatureEnabled()) return

@@ -34,7 +34,7 @@ internal object WalletPowerHooks {
             require(sosCount.type == Int::class.javaPrimitiveType && Modifier.isStatic(sosCount.modifiers))
             require(ModernReflect.findMethodExact(policy, "isCameraGestureEnabled", emptyArray()).returnType == Boolean::class.javaPrimitiveType)
             ModernHookBridge.atomic {
-                ModernReflect.findAndHookMethod(policy, "isCameraGestureEnabled",
+                ModernReflect.findAndHookMethod(policy, "isCameraGestureEnabled", emptyArray(),
                     object : ModernMethodHook() {
                         override fun afterHookedMethod(param: MethodHookParam) {
                             if (param.result != false || !FeatureConfig.enabled(FeaturePolicy.WALLET)) return
@@ -46,7 +46,7 @@ internal object WalletPowerHooks {
                         }
                     },
                 )
-                ModernReflect.findAndHookMethod(target, "isQuickLaunchSupport",
+                ModernReflect.findAndHookMethod(target, "isQuickLaunchSupport", emptyArray(),
                     object : ModernMethodHook() {
                         override fun afterHookedMethod(param: MethodHookParam) {
                             if (param.result != true || !FeatureConfig.enabled(FeaturePolicy.WALLET)) return

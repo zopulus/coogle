@@ -50,7 +50,7 @@ internal object NativeQuickEntryHooks {
         val contextField = ModernReflect.findField(cls, "mContext")
         val hostField = ModernReflect.findField(cls, "mHost")
         val getUserId = ModernReflect.findMethodExact(hostField.type, "getUserId", emptyArray())
-        ModernReflect.findAndHookMethod(cls, "isAvailable", object : ModernMethodHook() {
+        ModernReflect.findAndHookMethod(cls, "isAvailable", emptyArray(), object : ModernMethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {
                 val tile = param.thisObject ?: return
                 val context = contextField.get(tile) as Context
@@ -68,7 +68,7 @@ internal object NativeQuickEntryHooks {
         val cls = ModernReflect.findClass("com.oplus.systemui.qs.tiles.OplusQRCodeScannerTile", loader)
         val controllerField = ModernReflect.findField(cls, "qrCodeScannerController")
         val cameraAvailable = ModernReflect.findMethodExact(controllerField.type, "isCameraAvailable", emptyArray())
-        ModernReflect.findAndHookMethod(cls, "isAvailable", object : ModernMethodHook() {
+        ModernReflect.findAndHookMethod(cls, "isAvailable", emptyArray(), object : ModernMethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {
                 val tile = param.thisObject ?: return
                 param.result = cameraAvailable.invoke(controllerField.get(tile))

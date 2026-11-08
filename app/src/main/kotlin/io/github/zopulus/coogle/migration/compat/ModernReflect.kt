@@ -44,30 +44,11 @@ internal object ModernReflect {
     fun findAndHookMethod(
         targetClass: Class<*>,
         methodName: String,
-        vararg parameterTypesAndCallback: Any?,
+        parameterTypes: Array<out Class<*>>,
+        callback: ModernMethodHook,
     ): XposedInterface.HookHandle {
-        val request = parseHookRequest(parameterTypesAndCallback, targetClass.classLoader)
-        val method = findMethodExact(targetClass, methodName, request.parameterTypes)
-        return ModernHookBridge.hookMethod(method, request.callback)
-    }
-
-    private data class HookRequest(
-        val parameterTypes: Array<Class<*>>,
-        val callback: ModernMethodHook,
-    )
-
-    private fun parseHookRequest(values: Array<out Any?>, loader: ClassLoader?): HookRequest {
-        require(values.isNotEmpty()) { "Hook callback is missing" }
-        val callback = values.last() as? ModernMethodHook
-            ?: throw IllegalArgumentException("Last hook argument must be ModernMethodHook")
-        val parameterTypes = values.dropLast(1).map { value ->
-            when (value) {
-                is Class<*> -> value
-                is String -> findClass(value, loader)
-                else -> throw IllegalArgumentException("Unsupported parameter type: $value")
-            }
-        }.toTypedArray()
-        return HookRequest(parameterTypes, callback)
+        val method = findMethodExact(targetClass, methodName, parameterTypes)
+        return ModernHookBridge.hookMethod(method, callback)
     }
 
     internal fun findMethodExact(

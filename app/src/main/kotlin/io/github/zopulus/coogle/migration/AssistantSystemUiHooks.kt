@@ -327,7 +327,7 @@ internal object AssistantSystemUiHooks {
             XposedHelpers.findAndHookMethod(
                 Application::class.java,
                 "attach",
-                Context::class.java,
+                arrayOf(Context::class.java),
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         val context = param.args.firstOrNull() as? Context ?: return

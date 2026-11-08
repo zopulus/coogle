@@ -77,7 +77,7 @@ internal object WalletPreviewHooks {
                     }
                 }
             })
-            ModernReflect.findAndHookMethod(callbackType, "b", Any::class.java, object : ModernMethodHook() {
+            ModernReflect.findAndHookMethod(callbackType, "b", arrayOf(Any::class.java), object : ModernMethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val window = initializing.get()?.peekLast() ?: return
                     if (!window.preview || param.args[0] !== unit || !FeatureConfig.enabled(FeaturePolicy.WALLET)) return
