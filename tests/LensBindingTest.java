@@ -35,6 +35,34 @@ public final class LensBindingTest {
         boolean renamed() { return false; }
         long mode() { return 0; }
     }
+    static class Talk1773 {
+        Talk1773(Object provider, Object caller, Object dependency, Object scope, boolean one, boolean two,
+                 boolean three, boolean four, boolean five, boolean six, boolean seven,
+                 boolean eight, boolean nine, boolean ten, boolean eleven, Object state) {}
+        boolean renamed() { return false; }
+        long mode() { return 0; }
+    }
+    static class Wrong1773Prefix {
+        Wrong1773Prefix(Object provider, Object caller, Object dependency, boolean scope, boolean one, boolean two,
+                        boolean three, boolean four, boolean five, boolean six, boolean seven,
+                        boolean eight, boolean nine, boolean ten, boolean eleven, Object state) {}
+        boolean renamed() { return false; }
+        long mode() { return 0; }
+    }
+    static class Wrong1773Flag {
+        Wrong1773Flag(Object provider, Object caller, Object dependency, Object scope, boolean one, boolean two,
+                      boolean three, boolean four, boolean five, boolean six, boolean seven,
+                      boolean eight, boolean nine, boolean ten, int eleven, Object state) {}
+        boolean renamed() { return false; }
+        long mode() { return 0; }
+    }
+    static class UnknownExpandedLayout {
+        UnknownExpandedLayout(Object provider, Object caller, Object dependency, Object scope, boolean one, boolean two,
+                              boolean three, boolean four, boolean five, boolean six, boolean seven,
+                              boolean eight, boolean nine, boolean ten, boolean eleven, boolean twelve, Object state) {}
+        boolean renamed() { return false; }
+        long mode() { return 0; }
+    }
     static class WrongTalkFlag {
         WrongTalkFlag(Object provider, Object caller, Object scope, boolean one, boolean two,
                       boolean three, int four, boolean five, boolean six, Object state) {}
@@ -87,13 +115,22 @@ public final class LensBindingTest {
                 "Google 17.72 Talk layout not selected");
         check(LensBinding.isPair(create, current) && !LensBinding.isPair(current, create),
                 "Current cached target order not validated");
+        Method expanded = Talk1773.class.getDeclaredMethod("renamed");
+        Method[] expandedPair = LensBinding.select(List.of(wrong, expanded, create), Gate.class);
+        check(expandedPair != null && expandedPair[0].equals(create) && expandedPair[1].equals(expanded),
+                "Google 17.73 Talk layout not selected");
+        check(LensBinding.isPair(create, expanded) && !LensBinding.isPair(expanded, create),
+                "Google 17.73 cached target order not validated");
+        check(LensBinding.select(List.of(create, current, expanded), Gate.class) == null,
+                "Ambiguous 17.72/17.73 Talk controllers accepted");
         check(LensBinding.select(List.of(create, latest, current), Gate.class) == null,
                 "Ambiguous 17.70/17.72 Talk controllers accepted");
         check(LensBinding.select(List.of(create, updated, latest), Gate.class) == null,
                 "Ambiguous 17.68/17.70 Talk controllers accepted");
         check(LensBinding.select(List.of(create, talk, updated), Gate.class) == null,
                 "Ambiguous old/new Talk controllers accepted");
-        for (Class<?> invalid : List.of(WrongTalkFlag.class, UnknownTalkLayout.class, MissingMode.class))
+        for (Class<?> invalid : List.of(WrongTalkFlag.class, UnknownTalkLayout.class, MissingMode.class,
+                Wrong1773Prefix.class, Wrong1773Flag.class, UnknownExpandedLayout.class))
             check(LensBinding.select(List.of(create, invalid.getDeclaredMethod("renamed")), Gate.class) == null,
                     "Unsupported Talk controller accepted: " + invalid.getSimpleName());
         check(LensBinding.select(List.of(create, talk, DuplicateCreate.class.getDeclaredMethod("renamed")), Gate.class) == null,

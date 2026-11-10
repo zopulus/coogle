@@ -78,26 +78,36 @@ def main():
 
     files = [local / 'libdexkit.so']
     account = ROOT / 'tests/lens-stubs/com/google/apps/tiktok/account/AccountId.java'
-    for name in ('old-event', 'new-event', 'new-layout', 'latest-layout', 'current-layout', 'ambiguous', 'ambiguous-talk',
+    for name in ('old-event', 'new-event', 'new-layout', 'latest-layout', 'current-layout', '17-73-layout', 'ambiguous', 'ambiguous-talk',
                  'wrong-shape', 'wrong-talk-shape', 'latest-wrong-talk-shape', 'current-wrong-prefix',
-                 'current-wrong-flag', 'unknown-talk-layout', 'missing-talk'):
-        fixture = FIXTURE.replace('EVENT', '27390' if name == 'old-event' else '27507')
-        if name in ('new-layout', 'latest-layout', 'ambiguous-talk', 'wrong-talk-shape', 'latest-wrong-talk-shape', 'unknown-talk-layout') or name.startswith('current-'):
+                 'current-wrong-flag', '17-73-wrong-prefix', '17-73-wrong-flag', '17-73-wrong-tail',
+                 '17-73-unknown-layout', '17-73-ambiguous-talk', 'unknown-talk-layout', 'missing-talk'):
+        event = '27390' if name == 'old-event' else '28070' if name.startswith('17-73-') else '27507'
+        fixture = FIXTURE.replace('EVENT', event)
+        if name in ('new-layout', 'latest-layout', 'ambiguous-talk', 'wrong-talk-shape', 'latest-wrong-talk-shape', 'unknown-talk-layout') or name.startswith(('current-', '17-73-')):
             fixture = fixture.replace('boolean one, boolean two, Object state',
                                       'boolean one, boolean two, boolean three, boolean four, boolean five, boolean six, Object state')
-        if name in ('latest-layout', 'latest-wrong-talk-shape') or name.startswith('current-'):
+        if name in ('latest-layout', 'latest-wrong-talk-shape') or name.startswith(('current-', '17-73-')):
             fixture = fixture.replace('boolean six, Object state',
                                       'boolean six, boolean seven, boolean eight, boolean nine, boolean ten, Object state')
-        if name.startswith('current-'):
+        if name.startswith(('current-', '17-73-')):
             fixture = fixture.replace('Object a, Object b, Object c, boolean one',
                                       'Object a, Object b, Object dependency, Object c, boolean one')
-        if name == 'current-wrong-prefix':
+        if name.startswith('17-73-'):
+            fixture = fixture.replace('boolean ten, Object state', 'boolean ten, boolean eleven, Object state')
+        if name in ('current-wrong-prefix', '17-73-wrong-prefix'):
             fixture = fixture.replace('Object dependency', 'boolean dependency')
         if name == 'current-wrong-flag':
             fixture = fixture.replace('boolean ten', 'int ten')
         if name == 'latest-wrong-talk-shape':
             fixture = fixture.replace('boolean ten', 'int ten')
-        if name == 'ambiguous-talk':
+        if name == '17-73-wrong-flag':
+            fixture = fixture.replace('boolean eleven', 'int eleven')
+        if name == '17-73-wrong-tail':
+            fixture = fixture.replace('boolean eleven, Object state', 'boolean eleven, boolean state')
+        if name == '17-73-unknown-layout':
+            fixture = fixture.replace('boolean eleven, Object state', 'boolean eleven, boolean twelve, Object state')
+        if name in ('ambiguous-talk', '17-73-ambiguous-talk'):
             fixture += '''class DuplicateTalk {
                 private final Anchor anchor;
                 DuplicateTalk(Object a, Object b, Object c, boolean one, boolean two, Object state) { anchor = (Anchor)a; }
@@ -117,7 +127,7 @@ def main():
         source = local / (name + '.java')
         source.write_text(fixture, encoding='utf-8')
         files.append(compile_dex(name, [source, account]))
-    production = [SOURCE / (name + '.java') for name in ('AppDexTargets', 'CameraLensBinding', 'LensBinding', 'FeaturePolicy', 'ActionButtonLensBinding')]
+    production = [SOURCE / (name + '.java') for name in ('AppDexTargets', 'CameraLensBinding', 'LensBinding', 'FeaturePolicy', 'ActionButtonLensBinding', 'SearchBarBinding')]
     test = ROOT / 'tests/LensDexTest.java'
     files.append(compile_dex('runner', [*production, test], [dexkit, kotlin, flatbuffers]))
     if args.verify_regression:

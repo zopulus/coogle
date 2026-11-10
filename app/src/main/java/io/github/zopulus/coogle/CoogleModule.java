@@ -34,7 +34,8 @@ public final class CoogleModule extends XposedModule {
             }
             return;
         }
-        if ("com.android.launcher".equals(packageName)) SearchBarHooks.install(hooks, param.getClassLoader());
+        if ("com.android.launcher".equals(packageName)) SearchBarHooks.install(hooks, param.getClassLoader(),
+                param.getApplicationInfo().sourceDir, param.getApplicationInfo().dataDir);
         if ("com.oplus.gesture".equals(packageName)) ActionButtonLensHooks.install(hooks, param.getClassLoader(),
                 param.getApplicationInfo().sourceDir, param.getApplicationInfo().dataDir);
         if ("com.oplus.camera".equals(packageName)) CameraLensHooks.install(hooks, param.getClassLoader(),

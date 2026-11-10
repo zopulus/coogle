@@ -28,7 +28,7 @@ def main():
         dexkit.write_bytes(archive.read('classes.jar'))
         (local/'libdexkit.so').write_bytes(archive.read('jni/arm64-v8a/libdexkit.so'))
     source = ROOT/'app/src/main/java/io/github/zopulus/coogle'
-    production = [source/(name+'.java') for name in ('AppDexTargets','CameraLensBinding','FeaturePolicy','LensBinding','ActionButtonLensBinding','ActionButtonLensLaunch','ActionButtonLensCaller')]
+    production = [source/(name+'.java') for name in ('AppDexTargets','CameraLensBinding','FeaturePolicy','LensBinding','ActionButtonLensBinding','ActionButtonLensLaunch','ActionButtonLensCaller','SearchBarBinding')]
     def run(*command, **kwargs):
         return subprocess.run(list(map(str, command)), check=True, **kwargs)
     run(java/'javac.exe', '-encoding','UTF-8','-source','17','-target','17',

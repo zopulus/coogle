@@ -27,7 +27,7 @@ public final class OptionalAppHooksTest {
             }
         };
         HookInstaller disabled = new HookInstaller();
-        SearchBarHooks.install(disabled, loader);
+        SearchBarHooks.install(disabled, loader, null, null);
         SettingsHooks.installGoogleSettingsEntry(disabled, loader);
         check(disabled.installed == 0 && lookups[0] == 0, "Disabled features resolved targets or installed hooks");
 
@@ -41,13 +41,13 @@ public final class OptionalAppHooksTest {
                 enabled.put(FeaturePolicy.SEARCH_BAR, searchEnabled);
                 enabled.put(FeaturePolicy.GOOGLE_ENTRY, entryEnabled);
                 HookInstaller hooks = new HookInstaller();
-                SearchBarHooks.install(hooks, loader);
+                SearchBarHooks.install(hooks, loader, null, null);
                 SettingsHooks.installGoogleSettingsEntry(hooks, loader);
                 check(hooks.installed == (searchEnabled ? 4 : 0) + (entryEnabled ? 1 : 0), "Feature switches are coupled");
             }
         }
         HookInstaller hooks = new HookInstaller();
-        SearchBarHooks.install(hooks, loader);
+        SearchBarHooks.install(hooks, loader, null, null);
         SettingsHooks.installGoogleSettingsEntry(hooks, loader);
         expect(hooks, query, false, true, 0);
         expect(hooks, breeno, false, true, 0);
@@ -69,9 +69,63 @@ public final class OptionalAppHooksTest {
 
         enabled.put(FeaturePolicy.SEARCH_BAR, true);
         HookInstaller partial = new HookInstaller(); partial.failAt = 2;
-        SearchBarHooks.install(partial, loader);
+        SearchBarHooks.install(partial, loader, null, null);
         check(partial.installed == 0, "Partial search hook installation was not removed");
+        SearchBarBindingTest.main(args);
+        testRenamed(enabled);
         System.out.println("PASS: optional app startup guards, independent switches, native fallback and installation rollback");
+    }
+
+    private static void testRenamed(Map<String, Boolean> enabled) throws Throwable {
+        var directory = java.nio.file.Files.createTempDirectory("coogle-renamed-launcher");
+        var apk = directory.resolve("launcher.apk");
+        var cache = directory.resolve("coogle_app_targets_v1.cache");
+        try {
+            java.nio.file.Files.write(apk, new byte[]{1});
+            var stored = new java.util.Properties();
+            stored.setProperty("apk", "2:" + apk + ":" + apk.toFile().lastModified() + ":1");
+            stored.setProperty("search_bar.features-v1", SearchBarBindingTest.fixture());
+            try (var output = java.nio.file.Files.newOutputStream(cache)) { stored.store(output, "renamed launcher"); }
+            ClassLoader loader = new ClassLoader(OptionalAppHooksTest.class.getClassLoader()) {
+                @Override protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                    if (name.equals(FeatureOption.class.getName())) throw new ClassNotFoundException(name);
+                    return super.loadClass(name, resolve);
+                }
+            };
+            var binding = SearchBarBinding.parse(loader, SearchBarBindingTest.fixture());
+            HookInstaller hooks = new HookInstaller();
+            SearchBarHooks.install(hooks, loader, apk.toString(), directory.toString());
+            check(hooks.installed == 4, "Obfuscated launcher lost its search hooks");
+            SearchBarBindingTest.Renamed.export = false;
+            SearchBarBindingTest.Renamed.breeno = false;
+            SearchBarBindingTest.Renamed.search = true;
+            expect(hooks, binding.init, null, null, 1);
+            check(SearchBarBindingTest.Renamed.export && SearchBarBindingTest.Renamed.breeno
+                    && !SearchBarBindingTest.Renamed.search, "Wrong renamed launcher flags");
+            expect(hooks, binding.query, false, true, 0);
+            SearchBarBindingTest.Renamed.breeno = false;
+            SearchBarBindingTest.Renamed.search = true;
+            expect(hooks, binding.breeno, null, null, 1);
+            expect(hooks, binding.search, null, null, 1);
+            check(SearchBarBindingTest.Renamed.breeno && !SearchBarBindingTest.Renamed.search, "Package refresh reset entry flags");
+            enabled.put(FeaturePolicy.SEARCH_BAR, false);
+            SearchBarBindingTest.Renamed.export = false;
+            SearchBarBindingTest.Renamed.breeno = false;
+            SearchBarBindingTest.Renamed.search = true;
+            expect(hooks, binding.init, null, null, 1);
+            expect(hooks, binding.breeno, null, null, 1);
+            expect(hooks, binding.search, null, null, 1);
+            expect(hooks, binding.query, false, false, 1);
+            check(!SearchBarBindingTest.Renamed.export && !SearchBarBindingTest.Renamed.breeno
+                    && SearchBarBindingTest.Renamed.search, "Disabled renamed hooks changed native flags");
+            enabled.put(FeaturePolicy.SEARCH_BAR, true);
+            HookInstaller failed = new HookInstaller(); failed.failAt = 3;
+            SearchBarHooks.install(failed, loader, apk.toString(), directory.toString());
+            check(failed.installed == 0, "Renamed launcher partial hooks retained");
+        } finally {
+            java.nio.file.Files.deleteIfExists(cache); java.nio.file.Files.deleteIfExists(apk);
+            java.nio.file.Files.deleteIfExists(directory);
+        }
     }
     private static void expect(HookInstaller hooks, Method method, Object nativeResult, Object expected, int nativeCalls) throws Throwable {
         XposedInterface.Hooker hook = hooks.callbacks.get(method);

@@ -88,7 +88,7 @@ tasks.register('compileHookLifecycleTests', JavaCompile) {
     source files('../tests/SettingsUiStateTest.java')
     source files('../tests/WalletSettingsTest.java', '../tests/WalletPaymentCommandTest.java', '../tests/ScopeRestartTest.java')
     source files('../tests/CompanionControlTest.java', '../tests/CompanionUpgradeRegressionTest.java', '../tests/CameraLensEligibilityTest.java', '../tests/CameraNativeLensTest.java')
-    source files('../tests/CompanionSettingsTest.java', '../tests/OptionalAppHooksTest.java')
+    source files('../tests/CompanionSettingsTest.java', '../tests/OptionalAppHooksTest.java', '../tests/SearchBarBindingTest.java')
     source files('../tests/AssistantVoiceInstallTest.java')
     source files('../tests/GmsFeatureQueryTest.java')
     dependsOn 'compileReleaseJavaWithJavac'

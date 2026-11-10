@@ -17,15 +17,17 @@ public final class LensDexTest {
     private static void run(String[] args) throws Exception {
         String directory = args[0];
         System.out.println("Lens DEX scanner test started");
-        for (String name : new String[]{"old-event", "new-event", "new-layout", "latest-layout", "current-layout", "ambiguous", "ambiguous-talk",
+        for (String name : new String[]{"old-event", "new-event", "new-layout", "latest-layout", "current-layout", "17-73-layout", "ambiguous", "ambiguous-talk",
                 "wrong-shape", "wrong-talk-shape", "latest-wrong-talk-shape", "current-wrong-prefix",
-                "current-wrong-flag", "unknown-talk-layout", "missing-talk"}) {
+                "current-wrong-flag", "17-73-wrong-prefix", "17-73-wrong-flag", "17-73-wrong-tail",
+                "17-73-unknown-layout", "17-73-ambiguous-talk", "unknown-talk-layout", "missing-talk"}) {
             String path = directory + "/" + name + ".zip";
             ClassLoader loader = new DexClassLoader(path, directory, directory, LensDexTest.class.getClassLoader());
             try (AppDexTargets targets = new AppDexTargets(loader, path, null)) {
                 System.out.println("Scanning: " + name);
                 List<Method> methods = targets.resolve(FeaturePolicy.LENS);
-                if (name.endsWith("event") || name.equals("new-layout") || name.equals("latest-layout") || name.equals("current-layout")) {
+                if (name.endsWith("event") || name.equals("new-layout") || name.equals("latest-layout")
+                        || name.equals("current-layout") || name.equals("17-73-layout")) {
                     check(methods.size() >= 3, name + ": eligibility pair/callers missing");
                     check(methods.get(0).getDeclaringClass().getName().equals("fixture.RenamedCreate"), "Wrong create target");
                     check(methods.get(1).getDeclaringClass().getName().equals("fixture.RenamedTalk"), "Wrong talk target");
@@ -43,6 +45,7 @@ public final class LensDexTest {
         stale.setProperty(FeaturePolicy.LENS, "");
         stale.setProperty(FeaturePolicy.LENS + ".controllers-v2", "");
         stale.setProperty(FeaturePolicy.LENS + ".controllers-v3", "");
+        stale.setProperty(FeaturePolicy.LENS + ".controllers-v4", "");
         try (var output = Files.newOutputStream(cache.toPath())) { stale.store(output, "pre-fix layout miss"); }
         ClassLoader loader = new PathClassLoader(path + ":/system/framework/org.apache.http.legacy.jar", LensDexTest.class.getClassLoader());
         List<Method> found;
@@ -55,11 +58,13 @@ public final class LensDexTest {
         }
         Properties updated = new Properties();
         try (var input = Files.newInputStream(cache.toPath())) { updated.load(input); }
-        check(!updated.containsKey(FeaturePolicy.LENS), "Obsolete Lens miss retained");
-        check(!updated.containsKey(FeaturePolicy.LENS + ".controllers-v2"), "Obsolete 17.68 Lens miss retained");
-        check(!updated.containsKey(FeaturePolicy.LENS + ".controllers-v3"), "Obsolete 17.70 Lens miss retained");
+        for (String historical : new String[]{FeaturePolicy.LENS, FeaturePolicy.LENS + ".controllers-v2",
+                FeaturePolicy.LENS + ".controllers-v3", FeaturePolicy.LENS + ".controllers-v4"})
+            check("".equals(updated.getProperty(historical)), "Historical Lens cache was unnecessarily changed: " + historical);
+        check(!updated.getProperty(FeaturePolicy.LENS + ".controllers-v5", "").isEmpty(),
+                "Current locator did not persist its successful binding");
         System.out.println("PASS: " + apk.getName() + ": " + found.get(0) + ", " + found.get(1)
-                + "; targets=" + found.size() + "; old miss replaced and cached binding validated");
+                + "; targets=" + found.size() + "; old misses coexist and current cached binding validated");
     }
     private static void check(boolean value, String message) { if (!value) throw new AssertionError(message); }
 }

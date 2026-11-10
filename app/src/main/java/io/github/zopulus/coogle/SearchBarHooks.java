@@ -7,11 +7,23 @@ import static io.github.zopulus.coogle.HookInstaller.target;
 import static io.github.zopulus.coogle.HookInstaller.booleanMethod;
 
 final class SearchBarHooks {
-    static void install(HookInstaller hooks, ClassLoader loader) {
+    static void install(HookInstaller hooks, ClassLoader loader, String apkPath, String dataDir) {
         if (!FeatureConfig.enabled(FeaturePolicy.SEARCH_BAR)) return;
         int firstHandle = hooks.mark();
         try {
-            Class<?> feature=target(loader,"com.android.common.config.FeatureOption");
+            Class<?> feature;
+            try { feature=target(loader,"com.android.common.config.FeatureOption"); }
+            catch (ClassNotFoundException renamed) {
+                try (var targets = new AppDexTargets(loader, apkPath, dataDir)) {
+                    SearchBarBinding binding = targets.resolveSearchBar();
+                    if (binding == null) {
+                        hooks.info("SEARCH_BAR skip: launcher features not uniquely found");
+                        return;
+                    }
+                    installRenamed(hooks, binding);
+                }
+                return;
+            }
             Method query=booleanMethod(feature,"getHasQsbAtBottomFeature");
             Method breeno=booleanMethod(feature,"getSIsSupportBreenoEntry");
             Method search=booleanMethod(feature,"getSIsSupportSearchEntry");
@@ -36,5 +48,33 @@ final class SearchBarHooks {
             hooks.unhookSince(firstHandle);
             hooks.error("Google search bar unavailable; partial hooks removed",failure);
         }
+    }
+
+    private static void installRenamed(HookInstaller hooks, SearchBarBinding binding) {
+        for (Method caller : binding.callers) hooks.deoptimize(caller);
+        hooks.install(binding.query, chain -> FeatureConfig.enabled(FeaturePolicy.SEARCH_BAR) ? true : chain.proceed());
+        // These getters are now inlined field reads. Keep the native initializers and
+        // adjust only their inspected output flags, including later package refreshes.
+        hooks.install(binding.breeno, chain -> {
+            Object result = chain.proceed();
+            if (FeatureConfig.enabled(FeaturePolicy.SEARCH_BAR)) binding.breenoFlag.setBoolean(null, true);
+            return result;
+        });
+        hooks.install(binding.search, chain -> {
+            Object result = chain.proceed();
+            if (FeatureConfig.enabled(FeaturePolicy.SEARCH_BAR)) binding.searchFlag.setBoolean(null, false);
+            return result;
+        });
+        hooks.install(binding.init, chain -> {
+            Object result = chain.proceed();
+            if (FeatureConfig.enabled(FeaturePolicy.SEARCH_BAR)) {
+                binding.exportFlag.setBoolean(null, true);
+                binding.breenoFlag.setBoolean(null, true);
+                binding.searchFlag.setBoolean(null, false);
+            }
+            return result;
+        });
+        hooks.info("SEARCH_BAR installed: " + binding.init.getDeclaringClass().getName()
+                + "; QSB callers=" + binding.callers.size());
     }
 }
