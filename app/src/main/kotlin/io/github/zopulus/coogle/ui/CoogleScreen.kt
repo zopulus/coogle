@@ -55,6 +55,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +68,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -70,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import io.github.zopulus.coogle.BuildConfig
 import io.github.zopulus.coogle.FeaturePolicy
 import io.github.zopulus.coogle.R
+import kotlinx.coroutines.delay
 
 @Composable
 fun CoogleScreen(
@@ -231,10 +238,22 @@ private fun SettingRow(index: Int, count: Int, icon: ImageVector, title: String,
 @Composable
 private fun ToggleRow(index: Int, count: Int, icon: ImageVector, title: String, summary: String,
     checked: Boolean?, enabled: Boolean, onChange: (Boolean) -> Unit, saving: Boolean = false) {
-    SettingRow(index, count, icon, title, if (saving) "正在保存…" else summary,
-        { if (checked != null) onChange(!checked) }, enabled && checked != null && !saving,
-        Modifier.semantics { role = Role.Switch; stateDescription = if (saving) "正在保存" else
-            when (checked) { true -> "已开启"; false -> "已关闭"; null -> "正在读取" } }) {
+    // Brief commits keep the row stable; interaction is blocked for the entire save.
+    var showSaving by remember(saving) { mutableStateOf(false) }
+    LaunchedEffect(saving) {
+        if (saving) {
+            delay(250)
+            showSaving = true
+        }
+    }
+    SettingRow(index, count, icon, title, if (showSaving) "正在保存…" else summary,
+        { if (checked != null && !saving) onChange(!checked) }, enabled && checked != null && !showSaving,
+        Modifier.semantics {
+            role = Role.Switch
+            if (saving) disabled()
+            stateDescription = if (saving) "正在保存" else
+                when (checked) { true -> "已开启"; false -> "已关闭"; null -> "正在读取" }
+        }) {
         if (checked == null) {
             Box(Modifier.size(width = 52.dp, height = 32.dp).background(
                 MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(16.dp)))
@@ -243,7 +262,7 @@ private fun ToggleRow(index: Int, count: Int, icon: ImageVector, title: String, 
         Switch(
             checked = checked,
             onCheckedChange = null,
-            enabled = enabled && !saving,
+            enabled = enabled && !showSaving,
             thumbContent = if (checked || enabled) {
                 { Icon(if (checked) Icons.Rounded.Check else Icons.Rounded.Close, null, Modifier.size(SwitchDefaults.IconSize)) }
             } else null,
