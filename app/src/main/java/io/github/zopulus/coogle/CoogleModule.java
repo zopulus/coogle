@@ -54,7 +54,8 @@ public final class CoogleModule extends XposedModule {
             }
             if ("com.android.settings".equals(packageName) && FeatureConfig.enabled(FeaturePolicy.NAVIGATION)) SettingsHooks.installSettingsHiddenSupport(hooks, param.getClassLoader());
         }
-        if ("com.android.launcher".equals(packageName)) navigation.install(param.getClassLoader());
+        if ("com.android.launcher".equals(packageName)) navigation.install(param.getClassLoader(),
+                param.getApplicationInfo().sourceDir, param.getApplicationInfo().dataDir);
     }
 
 }

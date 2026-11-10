@@ -127,7 +127,7 @@ def main():
         source = local / (name + '.java')
         source.write_text(fixture, encoding='utf-8')
         files.append(compile_dex(name, [source, account]))
-    production = [SOURCE / (name + '.java') for name in ('AppDexTargets', 'CameraLensBinding', 'LensBinding', 'FeaturePolicy', 'ActionButtonLensBinding', 'SearchBarBinding')]
+    production = [SOURCE / (name + '.java') for name in ('AppDexTargets', 'CameraLensBinding', 'LensBinding', 'FeaturePolicy', 'ActionButtonLensBinding', 'SearchBarBinding', 'NavigationBinding', 'GateBinding')]
     test = ROOT / 'tests/LensDexTest.java'
     files.append(compile_dex('runner', [*production, test], [dexkit, kotlin, flatbuffers]))
     if args.verify_regression:

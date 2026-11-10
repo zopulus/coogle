@@ -82,14 +82,7 @@ internal object AssistantLauncherHooks {
             "com.android.quickstep.TouchInteractionService",
             classLoader,
         ) ?: return
-        sequenceOf(serviceClass, *serviceClass.declaredClasses)
-            .flatMap { it.declaredMethods.asSequence() }
-            .filter { method ->
-                method.name == "onAssistantAvailable" &&
-                    method.parameterTypes.size == 2 &&
-                    method.parameterTypes[0] == java.lang.Boolean.TYPE &&
-                    method.parameterTypes[1] == java.lang.Boolean.TYPE
-            }
+        LauncherAssistantBinding.findCallbacks(serviceClass)
             .forEach { method ->
                 val key = "launcher:assistant-available:${method.toGenericString()}"
                 if (!installedHooks.add(key)) return@forEach

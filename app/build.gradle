@@ -90,6 +90,7 @@ tasks.register('compileHookLifecycleTests', JavaCompile) {
     source files('../tests/CompanionControlTest.java', '../tests/CompanionUpgradeRegressionTest.java', '../tests/CameraLensEligibilityTest.java', '../tests/CameraNativeLensTest.java')
     source files('../tests/CompanionSettingsTest.java', '../tests/OptionalAppHooksTest.java', '../tests/SearchBarBindingTest.java')
     source files('../tests/AssistantVoiceInstallTest.java')
+    source files('../tests/NavigationHookTest.java', '../tests/LauncherAssistantBindingTest.java')
     source files('../tests/GmsFeatureQueryTest.java')
     dependsOn 'compileReleaseJavaWithJavac'
     source files('../tests/DexTargetCacheTest.java', '../tests/LensBindingTest.java', '../tests/lens-stubs/com/google/apps/tiktok/account/AccountId.java', '../tests/LensHookLifecycleTest.java', '../tests/SignalModelHookLifecycleTest.java', '../tests/RoleReconciliationTest.java', '../tests/HookInstallRollbackTest.java', '../tests/HiddenCircleNoAssistantTest.java', '../tests/FeatureQueryTest.java', '../tests/ContextBindingCacheTest.java') +
@@ -109,7 +110,7 @@ tasks.register('compileHookLifecycleTests', JavaCompile) {
     targetCompatibility = '17'
     options.encoding = 'UTF-8'
 }
-['OptionalAppHooksTest', 'ActionButtonLensTest', 'WalletNativeGestureCommandTest', 'WalletNativeGestureTest', 'WalletNativeEntryHookTest', 'WalletDismissQueueTest', 'WalletKeyguardHookTest', 'WalletPaymentReadTest', 'WalletPackageIsolationTest', 'WalletSettingsTest', 'WalletPaymentCommandTest', 'ScopeRestartTest', 'SettingsUiStateTest', 'ScopeRequestsTest', 'CompanionUpgradeRegressionTest', 'CameraNativeLensTest', 'CameraLensEligibilityTest', 'GmsFeatureQueryTest', 'CompanionControlTest', 'CompanionSettingsTest', 'DexTargetCacheTest', 'LensBindingTest', 'LensHookLifecycleTest', 'SignalModelHookLifecycleTest', 'RoleReconciliationTest', 'AssistantVoiceInstallTest', 'HookInstallRollbackTest', 'HiddenCircleNoAssistantTest', 'FeatureQueryTest', 'ContextBindingCacheTest'].each { testName ->
+['NavigationHookTest', 'LauncherAssistantBindingTest', 'OptionalAppHooksTest', 'ActionButtonLensTest', 'WalletNativeGestureCommandTest', 'WalletNativeGestureTest', 'WalletNativeEntryHookTest', 'WalletDismissQueueTest', 'WalletKeyguardHookTest', 'WalletPaymentReadTest', 'WalletPackageIsolationTest', 'WalletSettingsTest', 'WalletPaymentCommandTest', 'ScopeRestartTest', 'SettingsUiStateTest', 'ScopeRequestsTest', 'CompanionUpgradeRegressionTest', 'CameraNativeLensTest', 'CameraLensEligibilityTest', 'GmsFeatureQueryTest', 'CompanionControlTest', 'CompanionSettingsTest', 'DexTargetCacheTest', 'LensBindingTest', 'LensHookLifecycleTest', 'SignalModelHookLifecycleTest', 'RoleReconciliationTest', 'AssistantVoiceInstallTest', 'HookInstallRollbackTest', 'HiddenCircleNoAssistantTest', 'FeatureQueryTest', 'ContextBindingCacheTest'].each { testName ->
     tasks.register("test${testName}", JavaExec) {
         dependsOn 'compileHookLifecycleTests'
         classpath = files(lifecycleTestClasses) + tasks.named('compileHookLifecycleTests').get().classpath
@@ -117,6 +118,7 @@ tasks.register('compileHookLifecycleTests', JavaCompile) {
     }
 }
 tasks.register('testHookLifecycle') {
+    dependsOn 'testNavigationHookTest', 'testLauncherAssistantBindingTest'
     dependsOn 'testSettingsActivity'
     dependsOn 'testAssistantVoiceInstallTest'
     dependsOn 'testOptionalAppHooksTest'

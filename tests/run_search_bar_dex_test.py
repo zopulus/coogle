@@ -88,7 +88,7 @@ def main():
         path.write_text(source, encoding='utf-8')
         files.append(compile_dex(name, [path]))
     production = ROOT / 'app/src/main/java/io/github/zopulus/coogle'
-    sources = [production / (name + '.java') for name in ('AppDexTargets', 'SearchBarBinding', 'CameraLensBinding', 'LensBinding', 'FeaturePolicy', 'ActionButtonLensBinding')]
+    sources = [production / (name + '.java') for name in ('AppDexTargets', 'SearchBarBinding', 'NavigationBinding', 'GateBinding', 'CameraLensBinding', 'LensBinding', 'FeaturePolicy', 'ActionButtonLensBinding')]
     files.append(compile_dex('runner', [*sources, ROOT / 'tests/SearchBarDexTest.java'], [dexkit, kotlin, flat]))
     adb = [args.adb, '-s', args.serial]
     remote = '/data/local/tmp/coogle-search-test-' + uuid.uuid4().hex

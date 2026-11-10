@@ -113,6 +113,26 @@ final class AppDexTargets implements AutoCloseable {
         return binding;
     }
 
+    NavigationBinding resolveNavigation() throws ReflectiveOperationException {
+        String cacheKey = FeaturePolicy.NAVIGATION + ".gates-v1";
+        String saved = stored.getProperty(cacheKey);
+        if (saved != null) {
+            if (saved.isEmpty()) return null;
+            try {
+                NavigationBinding binding = NavigationBinding.parse(loader, saved);
+                if (binding != null) return binding;
+            } catch (ReflectiveOperationException | RuntimeException | LinkageError invalid) {
+                // Rebind members when a cached signature no longer matches.
+            }
+            stored.remove(cacheKey);
+            dirty = true;
+        }
+        NavigationBinding binding = NavigationBinding.find(bridge(), loader);
+        stored.setProperty(cacheKey, binding == null ? "" : binding.serialize());
+        dirty = true;
+        return binding;
+    }
+
     private DexKitBridge bridge() {
         if (bridge == null) {
             loadNative();
