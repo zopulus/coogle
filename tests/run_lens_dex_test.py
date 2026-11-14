@@ -78,7 +78,7 @@ def main():
 
     files = [local / 'libdexkit.so']
     account = ROOT / 'tests/lens-stubs/com/google/apps/tiktok/account/AccountId.java'
-    for name in ('old-event', 'new-event', 'new-layout', 'latest-layout', 'current-layout', '17-73-layout', 'ambiguous', 'ambiguous-talk',
+    for name in ('old-event', 'new-event', 'new-layout', 'latest-layout', 'current-layout', '17-73-layout', '17-75-layout', '17-75-wrong-prefix', '17-75-wrong-flag', '17-75-wrong-tail', '17-75-unknown-layout', '17-75-ambiguous-talk', 'ambiguous', 'ambiguous-talk',
                  'wrong-shape', 'wrong-talk-shape', 'latest-wrong-talk-shape', 'current-wrong-prefix',
                  'current-wrong-flag', '17-73-wrong-prefix', '17-73-wrong-flag', '17-73-wrong-tail',
                  '17-73-unknown-layout', '17-73-ambiguous-talk', 'unknown-talk-layout', 'missing-talk'):
@@ -95,6 +95,15 @@ def main():
                                       'Object a, Object b, Object dependency, Object c, boolean one')
         if name.startswith('17-73-'):
             fixture = fixture.replace('boolean ten, Object state', 'boolean ten, boolean eleven, Object state')
+        if name.startswith('17-75-'):
+            fixture = fixture.replace('Object a, Object b, Object c, boolean one', 'Object a, Object b, Object dependency, Object c, boolean one')
+            fixture = fixture.replace('boolean one, boolean two, Object state',
+                'boolean one, boolean two, boolean three, boolean four, boolean five, boolean six, boolean seven, boolean eight, boolean nine, boolean ten, boolean eleven, boolean twelve, Object state')
+        if name == '17-75-wrong-prefix': fixture = fixture.replace('Object dependency', 'boolean dependency')
+        if name == '17-75-wrong-flag': fixture = fixture.replace('boolean twelve', 'int twelve')
+        if name == '17-75-wrong-tail': fixture = fixture.replace('boolean twelve, Object state', 'boolean twelve, boolean state')
+        if name in ('17-75-unknown-layout', '17-73-unknown-layout'):
+            fixture = fixture.replace('boolean twelve, Object state', 'boolean twelve, boolean thirteen, Object state')
         if name in ('current-wrong-prefix', '17-73-wrong-prefix'):
             fixture = fixture.replace('Object dependency', 'boolean dependency')
         if name == 'current-wrong-flag':
@@ -106,8 +115,8 @@ def main():
         if name == '17-73-wrong-tail':
             fixture = fixture.replace('boolean eleven, Object state', 'boolean eleven, boolean state')
         if name == '17-73-unknown-layout':
-            fixture = fixture.replace('boolean eleven, Object state', 'boolean eleven, boolean twelve, Object state')
-        if name in ('ambiguous-talk', '17-73-ambiguous-talk'):
+            fixture = fixture.replace('boolean eleven, Object state', 'boolean eleven, boolean twelve, boolean thirteen, Object state')
+        if name in ('ambiguous-talk', '17-73-ambiguous-talk', '17-75-ambiguous-talk'):
             fixture += '''class DuplicateTalk {
                 private final Anchor anchor;
                 DuplicateTalk(Object a, Object b, Object c, boolean one, boolean two, Object state) { anchor = (Anchor)a; }

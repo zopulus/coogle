@@ -42,6 +42,13 @@ public final class LensBindingTest {
         boolean renamed() { return false; }
         long mode() { return 0; }
     }
+    static class Talk1775 {
+        Talk1775(Object provider, Object caller, Object dependency, Object scope, boolean one, boolean two,
+                 boolean three, boolean four, boolean five, boolean six, boolean seven,
+                 boolean eight, boolean nine, boolean ten, boolean eleven, boolean twelve, Object state) {}
+        boolean renamed() { return false; }
+        long mode() { return 0; }
+    }
     static class Wrong1773Prefix {
         Wrong1773Prefix(Object provider, Object caller, Object dependency, boolean scope, boolean one, boolean two,
                         boolean three, boolean four, boolean five, boolean six, boolean seven,
@@ -59,7 +66,7 @@ public final class LensBindingTest {
     static class UnknownExpandedLayout {
         UnknownExpandedLayout(Object provider, Object caller, Object dependency, Object scope, boolean one, boolean two,
                               boolean three, boolean four, boolean five, boolean six, boolean seven,
-                              boolean eight, boolean nine, boolean ten, boolean eleven, boolean twelve, Object state) {}
+                              boolean eight, boolean nine, boolean ten, boolean eleven, boolean twelve, boolean thirteen, Object state) {}
         boolean renamed() { return false; }
         long mode() { return 0; }
     }
@@ -121,6 +128,11 @@ public final class LensBindingTest {
                 "Google 17.73 Talk layout not selected");
         check(LensBinding.isPair(create, expanded) && !LensBinding.isPair(expanded, create),
                 "Google 17.73 cached target order not validated");
+        Method newest = Talk1775.class.getDeclaredMethod("renamed");
+        check(LensBinding.isPair(create, newest), "Google 17.75 Talk layout not selected");
+        check(!LensBinding.isPair(newest, create), "Google 17.75 cached pair order accepted");
+        check(LensBinding.select(List.of(create, newest, expanded), Gate.class) == null,
+                "Ambiguous 17.73/17.75 Talk controllers accepted");
         check(LensBinding.select(List.of(create, current, expanded), Gate.class) == null,
                 "Ambiguous 17.72/17.73 Talk controllers accepted");
         check(LensBinding.select(List.of(create, latest, current), Gate.class) == null,

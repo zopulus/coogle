@@ -54,7 +54,7 @@ final class AppDexTargets implements AutoCloseable {
             throw new IllegalArgumentException("Unsupported dynamic feature");
         // Revised locators must not reuse old descriptors or deterministic misses.
         String cacheKey = switch (feature) {
-            case FeaturePolicy.LENS -> feature + ".controllers-v5";
+            case FeaturePolicy.LENS -> feature + ".controllers-v6";
             case FeaturePolicy.CAMERA_LENS -> feature + ".native-v1";
             default -> feature;
         };

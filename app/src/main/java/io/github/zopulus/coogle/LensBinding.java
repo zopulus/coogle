@@ -45,8 +45,8 @@ final class LensBinding {
     }
 
     private static boolean isTalkConstructor(Class<?>[] p) {
-        // 17.72 adds a fourth leading reference; 17.73 adds an eleventh boolean flag.
-        if ((p.length != 6 && p.length != 10 && p.length != 14 && p.length != 15 && p.length != 16)
+        // 17.72 adds a fourth leading reference; 17.73/17.75 add the eleventh/twelfth flags.
+        if ((p.length != 6 && p.length != 10 && p.length != 14 && p.length != 15 && p.length != 16 && p.length != 17)
                 || p[p.length - 1].isPrimitive()) return false;
         int flagsStart = p.length >= 15 ? 4 : 3;
         for (int i = 0; i < flagsStart; i++) if (p[i].isPrimitive()) return false;
