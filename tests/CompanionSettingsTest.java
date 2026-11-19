@@ -50,6 +50,11 @@ public final class CompanionSettingsTest {
         support.installState = "DISABLED";
         check(control.install(null, prefs.api).equals("DISABLED") && !prefs.value("companion_ready"),
                 "Installing over a disabled module falsely reported pending/ready");
+        prefs.values.put(FeaturePolicy.HEY_GOOGLE, true);
+        prefs.values.put("companion_ready", true);
+        check(control.install(null, prefs.api).equals("DISABLED") && !prefs.value("companion_ready")
+                        && prefs.value(FeaturePolicy.HEY_GOOGLE) && support.enabled,
+                "Installing over a disabled module with Hey Google selected misreported failure or lost the choice");
         support.installState = "PENDING";
         support.state = "PENDING"; control.save(prefs.api, true);
         check(prefs.value(FeaturePolicy.HEY_GOOGLE) && prefs.value("companion_ready"), "Staged install rejected");

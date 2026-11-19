@@ -20,6 +20,10 @@ final class CompanionSettings {
     CompanionSettings(Support support) { this.support = support; }
 
     synchronized String save(SharedPreferences settings, boolean enabled) throws Exception {
+        return save(settings, enabled, false);
+    }
+
+    private String save(SharedPreferences settings, boolean enabled, boolean installing) throws Exception {
         boolean previous = requested(settings);
         boolean previousReady = settings.getBoolean("companion_ready", false);
         boolean previousKnown = settings.getBoolean("companion_known", false);
@@ -27,7 +31,8 @@ final class CompanionSettings {
             String state = support.set(enabled);
             boolean ready = installed(state);
             boolean known = !"MISSING".equals(state);
-            if (enabled && !ready) throw new IOException("请先安装并启用新版附属模块。");
+            if (enabled && !ready && !(installing && "DISABLED".equals(state)))
+                throw new IOException("请先安装并启用新版附属模块。");
             if (enabled != previous || ready != previousReady || known != previousKnown)
                 commit(settings.edit().putBoolean(FeaturePolicy.HEY_GOOGLE, enabled)
                         .putBoolean("companion_ready", ready).putBoolean("companion_known", known));
@@ -60,7 +65,7 @@ final class CompanionSettings {
     synchronized String install(Context context, SharedPreferences settings) throws Exception {
         boolean enabled = requested(settings);
         support.install(context);
-        return save(settings, enabled);
+        return save(settings, enabled, true);
     }
     static boolean shouldCheck(SharedPreferences settings) {
         return requested(settings) || settings.getBoolean("companion_ready", false) || settings.getBoolean("companion_known", false);
