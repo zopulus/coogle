@@ -1,7 +1,11 @@
 <resources>
+    <!-- COUI dark palette. -->
+    <color name="startup_surface">#000000</color>
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/startup_surface</item>
+        <item name="android:windowSplashScreenBackground">@color/startup_surface</item>
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">@android:color/system_accent1_200</item>
+        <item name="android:colorAccent">#1A8CFF</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowActionModeOverlay">true</item>

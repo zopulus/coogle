@@ -1,7 +1,11 @@
 <resources>
+    <!-- COUI light palette, drawn before Compose loads the saved interface style. -->
+    <color name="startup_surface">#F0F1F2</color>
     <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/startup_surface</item>
+        <item name="android:windowSplashScreenBackground">@color/startup_surface</item>
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">@android:color/system_accent1_600</item>
+        <item name="android:colorAccent">#0080FF</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>

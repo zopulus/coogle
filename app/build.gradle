@@ -30,6 +30,8 @@ dependencies {
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.material3:material3:1.5.0-alpha28'
     implementation 'androidx.compose.material:material-icons-extended:1.7.8'
+    implementation 'io.github.suqi8.coui.kmp:coui-preference-android:2.0.0'
+    implementation 'io.github.suqi8.coui.kmp:coui-icons-android:2.0.0'
     implementation 'androidx.core:core-ktx:1.17.0'
     implementation 'org.luckypray:dexkit:2.3.0'
 }

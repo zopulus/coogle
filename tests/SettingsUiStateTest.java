@@ -37,6 +37,10 @@ public final class SettingsUiStateTest {
         check(state(CompanionState.READY, false, "").getHeyAvailable() && state(CompanionState.PENDING, false, "").getHeyAvailable(), "Installed support cannot configure Hey Google");
         check(state(CompanionState.READY, false, "").getHeyDescription().equals("补全系统级 Voice Match 功能"), "Hey Google description changed");
         check(!state(CompanionState.DISABLED, false, "").getHeyAvailable(), "Disabled support enabled Hey Google toggle");
+        CoogleState disabled = state(CompanionState.DISABLED, false, "");
+        check(disabled.canChangeFeature(FeaturePolicy.HEY_GOOGLE, false), "Unavailable support blocked turning Hey Google off");
+        check(!disabled.canChangeFeature(FeaturePolicy.HEY_GOOGLE, true), "Unavailable support allowed turning Hey Google on");
+        check(disabled.canChangeFeature(FeaturePolicy.LENS, true), "Companion state blocked an independent feature");
         System.out.println("PASS: neutral startup, four installation states, cache, background refresh and failure preservation");
     }
     private static CoogleState state(CompanionState status, boolean checking, String error) {

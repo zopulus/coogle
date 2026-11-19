@@ -19,9 +19,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.core.content.edit
 import io.github.zopulus.coogle.ui.CoogleScreen
 import io.github.zopulus.coogle.ui.CoogleState
-import io.github.zopulus.coogle.ui.CoogleTheme
 import io.github.zopulus.coogle.ui.CompanionState
 import io.github.zopulus.coogle.ui.DialogKind
+import io.github.zopulus.coogle.ui.UiStyle
 import io.github.libxposed.service.XposedService
 import java.io.IOException
 import java.util.concurrent.Executors
@@ -53,10 +53,12 @@ class MainActivity : ComponentActivity() {
     }
     private val uiCache by lazy { getSharedPreferences("ui_state", MODE_PRIVATE) }
     private var state by mutableStateOf(CoogleState())
+    private var uiStyle by mutableStateOf(UiStyle.default)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        uiStyle = UiStyle.fromPreference(uiCache.getString("ui_style", null))
         val cached = if (uiCache.getBoolean("features_saved", false))
             CoogleState.featureKeys.associateWith { uiCache.getBoolean(it, FeaturePolicy.defaultValue(it)) } else emptyMap()
         val companion = runCatching { CompanionState.valueOf(uiCache.getString("companion", "UNKNOWN")!!) }
@@ -66,13 +68,17 @@ class MainActivity : ComponentActivity() {
         SettingsConnection.connect(this)
         main.postDelayed(connectionTimeout, 700)
         setContent {
-            CoogleTheme {
-                CoogleScreen(state, savingKeys, ::changeSetting, ::openAssistant, ::changeIconVisibility,
-                    { showDialog(DialogKind.STATUS); if (state.connected == true) checkCompanion() }, ::openRepository,
-                    ::confirmDialog, ::dismissDialog,
-                    { showDialog(DialogKind.RESTART) })
-            }
+            CoogleScreen(state, savingKeys, uiStyle, ::changeSetting, ::openAssistant, ::changeIconVisibility,
+                { showDialog(DialogKind.STATUS); if (state.connected == true) checkCompanion() }, ::openRepository,
+                ::confirmDialog, ::dismissDialog,
+                { showDialog(DialogKind.RESTART) }, ::changeUiStyle)
         }
+    }
+
+    private fun changeUiStyle(style: UiStyle) {
+        if (style == uiStyle) return
+        uiCache.edit { putString("ui_style", style.name) }
+        uiStyle = style
     }
 
     override fun onResume() {
@@ -124,8 +130,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun changeSetting(key: String, enabled: Boolean) {
-        if (state.connected != true || state.scopePending || state.restarting || preferences == null || key in savingKeys) return
-        if (key == FeaturePolicy.HEY_GOOGLE && (state.busy || !state.heyAvailable)) return
+        if (!state.canChangeFeature(key, enabled) || preferences == null || key in savingKeys) return
         if (state.features[key] == enabled) return
         if (enabled) SettingsConnection.requestScopes(key)
         else saveSetting(key, false)
@@ -138,8 +143,7 @@ class MainActivity : ComponentActivity() {
     fun onScopeResult(key: String, message: String?) {
         if (isDestroyed) return
         if (message != null) { error(message); return }
-        if (preferences == null || key in savingKeys) return
-        if (key == FeaturePolicy.HEY_GOOGLE && !state.heyAvailable) return
+        if (!state.canChangeFeature(key, true) || preferences == null || key in savingKeys) return
         saveSetting(key, true)
     }
 

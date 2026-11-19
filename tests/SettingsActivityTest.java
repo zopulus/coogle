@@ -11,28 +11,35 @@ import java.util.concurrent.*;
 public final class SettingsActivityTest {
     static final class Preferences {
         final Map<String, Boolean> values = new ConcurrentHashMap<>();
+        final Map<String, String> strings = new HashMap<>();
         final CountDownLatch committing = new CountDownLatch(1), release = new CountDownLatch(1);
         boolean block, fail;
         int commits;
         final SharedPreferences settings = (SharedPreferences) Proxy.newProxyInstance(
                 SharedPreferences.class.getClassLoader(), new Class<?>[]{SharedPreferences.class}, (p,m,a) -> switch (m.getName()) {
             case "getBoolean" -> values.getOrDefault((String) a[0], (Boolean) a[1]);
+            case "getString" -> strings.getOrDefault((String) a[0], (String) a[1]);
             case "edit" -> editor();
             default -> throw new AssertionError("Unexpected preferences call: " + m.getName());
         });
         SharedPreferences.Editor editor() {
             Map<String, Boolean> pending = new HashMap<>();
+            Map<String, String> pendingStrings = new HashMap<>();
             return (SharedPreferences.Editor) Proxy.newProxyInstance(SharedPreferences.class.getClassLoader(),
                     new Class<?>[]{SharedPreferences.Editor.class}, (p,m,a) -> {
                 if (m.getName().equals("putBoolean")) pending.put((String) a[0], (Boolean) a[1]);
+                else if (m.getName().equals("putString")) pendingStrings.put((String) a[0], (String) a[1]);
                 else if (m.getName().equals("commit")) {
                     commits++;
                     committing.countDown();
                     if (block && !release.await(5, TimeUnit.SECONDS)) throw new AssertionError("Commit boundary timeout");
                     if (!fail) values.putAll(pending);
                     return !fail;
-                } else if (m.getName().equals("apply")) { values.putAll(pending); return null; }
-                else if (!m.getName().equals("putString")) throw new AssertionError(m.getName());
+                } else if (m.getName().equals("apply")) {
+                    values.putAll(pending);
+                    strings.putAll(pendingStrings);
+                    return null;
+                } else throw new AssertionError(m.getName());
                 return p;
             });
         }
@@ -42,12 +49,13 @@ public final class SettingsActivityTest {
         List<Throwable> failures = new ArrayList<>();
         try {
             for (String scenario : List.of("retry", "restart", "recreated-restart",
-                    "save-state-success", "save-state-failure", "save-error", "root-wait")) {
+                    "save-state-success", "save-state-failure", "save-error", "root-wait", "ui-style")) {
                 try {
                     if (scenario.equals("retry")) retry();
                     else if (scenario.startsWith("save-state")) saveState(scenario.endsWith("failure"));
                     else if (scenario.equals("save-error")) saveError();
                     else if (scenario.equals("root-wait")) rootWait();
+                    else if (scenario.equals("ui-style")) uiStyle();
                     else restart(scenario.startsWith("recreated"));
                     System.out.println("PASS: " + scenario);
                 } catch (AssertionError failure) {
@@ -166,9 +174,31 @@ public final class SettingsActivityTest {
                 "Failed save could not be retried");
     }
     static MainActivity activity(Preferences preferences) throws Exception {
+        return activity(preferences, new Preferences());
+    }
+    static void uiStyle() throws Exception {
+        Preferences preferences = new Preferences();
+        Preferences cache = new Preferences();
+        cache.strings.put("companion", "READY");
+        MainActivity activity = activity(preferences, cache);
+        CoogleState initial = state(activity);
+        check(invoke(activity, "getUiStyle") == UiStyle.COUI, "Initial appearance is not COUI");
+        check(UiStyle.fromPreference(null) == UiStyle.COUI, "Fresh install did not default to COUI");
+        check(UiStyle.fromPreference("unknown") == UiStyle.COUI, "Unknown stored style did not fall back");
+        check(UiStyle.values()[0] == UiStyle.COUI, "COUI is not the first selector option");
+        for (UiStyle choice : List.of(UiStyle.MATERIAL, UiStyle.COUI)) {
+            invoke(activity, "changeUiStyle", new Class<?>[]{UiStyle.class}, choice);
+            check(invoke(activity, "getUiStyle") == choice, "Appearance did not update immediately");
+            check(UiStyle.fromPreference(cache.settings.getString("ui_style", null)) == choice, "Appearance was not saved");
+        }
+        check(state(activity) == initial && preferences.values.isEmpty() && preferences.strings.isEmpty(),
+                "Appearance changed feature state or remote preferences");
+        check(cache.strings.equals(Map.of("companion", "READY", "ui_style", "COUI")),
+                "Appearance overwrote unrelated local settings");
+    }
+    static MainActivity activity(Preferences preferences, Preferences cache) throws Exception {
         MainActivity activity = new MainActivity();
         field("preferences").set(activity, preferences.settings);
-        Preferences cache = new Preferences();
         field("uiCache$delegate").set(activity, new kotlin.Lazy<SharedPreferences>() {
             public SharedPreferences getValue() { return cache.settings; }
             public boolean isInitialized() { return true; }

@@ -31,6 +31,10 @@ data class CoogleState(
     val navigationDescription: String get() = if (companion == CompanionState.MISSING)
         "补全设置中的导航方式，圈定即搜实时翻译功能需点击激活状态卡片安装附属模块" else "补全设置中的导航方式"
     val heyAvailable: Boolean get() = companion == CompanionState.READY || companion == CompanionState.PENDING
+    fun canChangeFeature(key: String, enabled: Boolean): Boolean =
+        connected == true && !scopePending && !restarting &&
+            (key != FeaturePolicy.HEY_GOOGLE || (!busy && (!enabled || heyAvailable)))
+
     val heyDescription: String get() = if (companion == CompanionState.UNKNOWN || companion == CompanionState.MISSING)
         "补全系统级 Voice Match 功能，需点击激活状态卡片安装附属模块" else "补全系统级 Voice Match 功能"
     val companionSummary: String get() = if (companionError.isNotEmpty())

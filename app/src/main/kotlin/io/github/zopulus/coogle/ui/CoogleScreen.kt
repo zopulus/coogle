@@ -6,6 +6,8 @@ package io.github.zopulus.coogle.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
@@ -13,10 +15,12 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -56,6 +60,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
@@ -72,14 +78,62 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import io.github.zopulus.coogle.BuildConfig
 import io.github.zopulus.coogle.FeaturePolicy
 import io.github.zopulus.coogle.R
 import kotlinx.coroutines.delay
+import io.github.suqi8.coui.kmp.basic.BasicComponent
+import io.github.suqi8.coui.kmp.basic.COUIScrollBehavior
+import io.github.suqi8.coui.kmp.basic.Card as CouiCard
+import io.github.suqi8.coui.kmp.basic.CardListPosition
+import io.github.suqi8.coui.kmp.basic.CompleteStateDefaults
+import io.github.suqi8.coui.kmp.basic.Icon as CouiIcon
+import io.github.suqi8.coui.kmp.basic.IconButton as CouiIconButton
+import io.github.suqi8.coui.kmp.basic.Scaffold as CouiScaffold
+import io.github.suqi8.coui.kmp.basic.SwitchDefaults as CouiSwitchDefaults
+import io.github.suqi8.coui.kmp.basic.TagView
+import io.github.suqi8.coui.kmp.basic.TagViewDefaults
+import io.github.suqi8.coui.kmp.basic.Text as CouiText
+import io.github.suqi8.coui.kmp.basic.TopAppBar as CouiTopAppBar
+import io.github.suqi8.coui.kmp.basic.cardListPositionOf
+import io.github.suqi8.coui.kmp.layout.DialogButtonBar
+import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
+import io.github.suqi8.coui.kmp.preference.ArrowPreference
+import io.github.suqi8.coui.kmp.preference.PreferenceCategory
+import io.github.suqi8.coui.kmp.preference.PreferenceCategoryMarginStartType
+import io.github.suqi8.coui.kmp.preference.SwitchLoadingPreference
+import io.github.suqi8.coui.kmp.theme.COUITheme
+import io.github.suqi8.coui.kmp.utils.scrollEndHaptic
+import io.github.suqi8.coui.kmp.layout.DialogDefaults
+import io.github.suqi8.coui.kmp.window.WindowDialog
 
 @Composable
 fun CoogleScreen(
+    state: CoogleState,
+    savingKeys: Set<String>,
+    style: UiStyle,
+    onSetting: (String, Boolean) -> Unit,
+    onAssistant: () -> Unit,
+    onIconVisibility: (Boolean) -> Unit,
+    onStatus: () -> Unit,
+    onAbout: () -> Unit,
+    onDialogConfirm: () -> Unit,
+    onDialogDismiss: () -> Unit,
+    onRestart: () -> Unit,
+    onUiStyle: (UiStyle) -> Unit
+) {
+    val scrollState = rememberScrollState()
+    CoogleTheme(style) {
+        CoogleContent(state, savingKeys, onSetting, onAssistant, onIconVisibility, onStatus,
+            onAbout, onDialogConfirm, onDialogDismiss, onRestart, onUiStyle, scrollState)
+    }
+}
+
+@Composable
+private fun CoogleContent(
     state: CoogleState,
     savingKeys: Set<String>,
     onSetting: (String, Boolean) -> Unit,
@@ -89,84 +143,92 @@ fun CoogleScreen(
     onAbout: () -> Unit,
     onDialogConfirm: () -> Unit,
     onDialogDismiss: () -> Unit,
-    onRestart: () -> Unit
+    onRestart: () -> Unit,
+    onUiStyle: (UiStyle) -> Unit,
+    scrollState: ScrollState
 ) {
-    val bar = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-    Scaffold(
-        modifier = Modifier.nestedScroll(bar.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = {
-            TwoRowsTopAppBar(
-                // Match KernelSU's LargeFlexibleTopAppBar title tokens; only the expanded row has a subtitle.
-                title = { expanded -> Text("Coogle", style = if (expanded) MaterialTheme.typography.displaySmall else MaterialTheme.typography.titleLarge) },
-                subtitle = { expanded -> if (expanded) Text("让国行版ColorOS更加Google", style = MaterialTheme.typography.titleMedium) },
-                collapsedHeight = TopAppBarDefaults.LargeAppBarCollapsedHeight,
-                expandedHeight = TopAppBarDefaults.LargeFlexibleAppBarWithSubtitleExpandedHeight,
-                actions = {
-                    val enabled = state.connected == true && !state.busy && !state.restarting && !state.scopePending && savingKeys.isEmpty()
-                    IconButton(onClick = onRestart, enabled = enabled) {
-                        ControlIcon(ControlIcons.Restart, "重启作用域", enabled)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer),
-                windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-                scrollBehavior = bar
-            )
-        }
-    ) { padding ->
-        Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+    val coui = LocalUiStyle.current == UiStyle.COUI
+    val restartEnabled = state.connected == true && !state.busy && !state.restarting && !state.scopePending && savingKeys.isEmpty()
+    SettingsScaffold(restartEnabled, onRestart) { padding ->
+        val scrollFeedback = if (coui) Modifier.scrollEndHaptic() else Modifier
+        Column(Modifier.padding(padding).consumeWindowInsets(padding)
+            .then(scrollFeedback).verticalScroll(scrollState).padding(horizontal = 16.dp)) {
             Spacer(Modifier.height(12.dp))
-            // Same Surface, ListItem and StatusTag geometry as KernelSU HomeMaterial.
-            val statusColor = when (state.connected) {
-                true -> MaterialTheme.colorScheme.secondaryContainer
-                false -> MaterialTheme.colorScheme.errorContainer
-                null -> MaterialTheme.colorScheme.surfaceContainerHigh
+            val statusTitle = when (state.connected) { true -> "已激活"; false -> "未激活"; null -> "正在连接…" }
+            val statusIcon = when (state.connected) {
+                true -> Icons.Rounded.CheckCircle
+                false -> Icons.Rounded.HighlightOff
+                null -> Icons.Rounded.Extension
             }
-            val statusContentColor = MaterialTheme.colorScheme.contentColorFor(statusColor)
-            Surface(modifier = Modifier.fillMaxWidth(), color = statusColor,
-                contentColor = statusContentColor, shape = MaterialTheme.shapes.large,
-                onClick = onStatus) {
-                ListItem(
-                    leadingContent = {
-                        Icon(when (state.connected) {
-                            true -> Icons.Rounded.CheckCircle
-                            false -> Icons.Rounded.HighlightOff
-                            null -> Icons.Rounded.Extension
+            if (coui) {
+                val colors = COUITheme.colorScheme
+                val tint = when (state.connected) {
+                    true -> CompleteStateDefaults.SuccessColor
+                    false -> colors.error
+                    null -> colors.labelSecondary
+                }
+                val couiStatusIcon = if (state.connected == true)
+                    ImageVector.vectorResource(R.drawable.ic_status_complete) else statusIcon
+                CouiCard(modifier = Modifier.fillMaxWidth()) {
+                    BasicComponent(
+                        title = statusTitle,
+                        summary = state.companionSummary,
+                        startAction = { CouiIcon(couiStatusIcon, null, Modifier.size(24.dp), tint = tint) },
+                        endActions = {
+                            TagView("API 102", colors = TagViewDefaults.tagViewColors(
+                                containerColor = colors.fillSolid,
+                                contentColor = colors.labelPrimary
+                            ))
                         },
-                            contentDescription = null)
-                    },
-                    trailingContent = {
-                        Box(Modifier.padding(end = 4.dp).background(
-                            MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
-                            Text("API 102", Modifier.padding(vertical = 2.dp, horizontal = 4.dp),
-                                style = MaterialTheme.typography.labelSmallEmphasized,
-                                color = MaterialTheme.colorScheme.onPrimary)
+                        cardListPosition = CardListPosition.Full,
+                        onClick = onStatus
+                    )
+                }
+            } else {
+                // Same Surface, ListItem and StatusTag geometry as KernelSU HomeMaterial.
+                val statusColor = when (state.connected) {
+                    true -> MaterialTheme.colorScheme.secondaryContainer
+                    false -> MaterialTheme.colorScheme.errorContainer
+                    null -> MaterialTheme.colorScheme.surfaceContainerHigh
+                }
+                val statusContentColor = MaterialTheme.colorScheme.contentColorFor(statusColor)
+                Surface(modifier = Modifier.fillMaxWidth(), color = statusColor,
+                    contentColor = statusContentColor, shape = MaterialTheme.shapes.large,
+                    onClick = onStatus) {
+                    ListItem(
+                        leadingContent = {
+                            Icon(statusIcon, contentDescription = null)
+                        },
+                        trailingContent = {
+                            Box(Modifier.padding(end = 4.dp).background(
+                                MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
+                                Text("API 102", Modifier.padding(vertical = 2.dp, horizontal = 4.dp),
+                                    style = MaterialTheme.typography.labelSmallEmphasized,
+                                    color = MaterialTheme.colorScheme.onPrimary)
+                            }
+                        },
+                        overlineContent = null,
+                        supportingContent = {
+                            Text(state.companionSummary, style = MaterialTheme.typography.bodyMedium)
+                        },
+                        verticalAlignment = Alignment.CenterVertically,
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent,
+                            contentColor = statusContentColor, leadingContentColor = statusContentColor,
+                            trailingContentColor = statusContentColor,
+                            supportingContentColor = statusContentColor.copy(alpha = 0.7f)),
+                        elevation = ListItemDefaults.elevation(),
+                        content = {
+                            Text(statusTitle, style = MaterialTheme.typography.titleMediumEmphasized)
                         }
-                    },
-                    overlineContent = null,
-                    supportingContent = {
-                        Text(state.companionSummary, style = MaterialTheme.typography.bodyMedium)
-                    },
-                    verticalAlignment = Alignment.CenterVertically,
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent,
-                        contentColor = statusContentColor, leadingContentColor = statusContentColor,
-                        trailingContentColor = statusContentColor,
-                        supportingContentColor = statusContentColor.copy(alpha = 0.7f)),
-                    elevation = ListItemDefaults.elevation(),
-                    content = {
-                        Text(when (state.connected) { true -> "已激活"; false -> "未激活"; null -> "正在连接…" },
-                            style = MaterialTheme.typography.titleMediumEmphasized)
-                    }
-                )
+                    )
+                }
             }
-            val available = state.connected == true && !state.scopePending && !state.restarting
+            val available = state.canChangeFeature(FeaturePolicy.NAVIGATION, true)
+            val hey = state.features[FeaturePolicy.HEY_GOOGLE]
             Group("数字助理") {
                 SettingRow(0, 3, Icons.Rounded.RecordVoiceOver, "默认数字助理", state.assistant, onClick = onAssistant)
                 ToggleRow(1, 3, Icons.Rounded.Mic, "Hey Google", state.heyDescription,
-                    checked = state.features[FeaturePolicy.HEY_GOOGLE], enabled = available && !state.busy && state.heyAvailable,
+                    checked = hey, enabled = state.canChangeFeature(FeaturePolicy.HEY_GOOGLE, hey != true),
                     onChange = { onSetting(FeaturePolicy.HEY_GOOGLE, it) }, saving = FeaturePolicy.HEY_GOOGLE in savingKeys)
                 ToggleRow(2, 3, ImageVector.vectorResource(R.drawable.action_lens_color), "Google智能镜头", "补全Google智能镜头功能",
                     state.features[FeaturePolicy.LENS], available, { onSetting(FeaturePolicy.LENS, it) }, FeaturePolicy.LENS in savingKeys)
@@ -188,9 +250,10 @@ fun CoogleScreen(
                     state.features[FeaturePolicy.GOOGLE_ENTRY], available, { onSetting(FeaturePolicy.GOOGLE_ENTRY, it) }, FeaturePolicy.GOOGLE_ENTRY in savingKeys)
             }
             Group("其他设置") {
-                ToggleRow(0, 2, Icons.Rounded.VisibilityOff, "隐藏桌面图标", "隐藏后，可从 LSPosed 中打开",
+                UiStyleRow(0, 3, onUiStyle)
+                ToggleRow(1, 3, Icons.Rounded.VisibilityOff, "隐藏桌面图标", "隐藏后，可从 LSPosed 中打开",
                     state.iconHidden, true, onIconVisibility)
-                SettingRow(1, 2, Icons.Rounded.Info, "关于 Coogle", "zopulus · ${BuildConfig.VERSION_NAME}", onClick = onAbout)
+                SettingRow(2, 3, Icons.Rounded.Info, "关于 Coogle", "zopulus · ${BuildConfig.VERSION_NAME}", onClick = onAbout)
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -199,24 +262,99 @@ fun CoogleScreen(
 }
 
 @Composable
-private fun ControlIcon(vector: ImageVector, description: String? = null, enabled: Boolean = true) {
+private fun SettingsScaffold(restartEnabled: Boolean, onRestart: () -> Unit, content: @Composable (PaddingValues) -> Unit) {
+    if (LocalUiStyle.current == UiStyle.COUI) {
+        val bar = COUIScrollBehavior()
+        CouiScaffold(
+            modifier = Modifier.nestedScroll(bar.nestedScrollConnection),
+            contentWindowInsets = WindowInsets.safeDrawing,
+            topBar = {
+                CouiTopAppBar(
+                    title = "Coogle",
+                    subtitle = "让国行版ColorOS更加Google",
+                    scrollBehavior = bar,
+                    actions = {
+                        CouiIconButton(onClick = onRestart, enabled = restartEnabled) {
+                            val colors = COUITheme.colorScheme
+                            CouiIcon(ControlIcons.Restart, "重启作用域", Modifier.size(24.dp),
+                                tint = if (restartEnabled) colors.labelPrimary else colors.disabledNeutral)
+                        }
+                    }
+                )
+            },
+            content = content
+        )
+        return
+    }
+    val bar = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val background = MaterialTheme.colorScheme.surfaceContainer
+    Scaffold(
+        modifier = Modifier.nestedScroll(bar.nestedScrollConnection),
+        containerColor = background,
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = {
+            TwoRowsTopAppBar(
+                // Match KernelSU's LargeFlexibleTopAppBar title tokens.
+                title = { expanded -> Text("Coogle", style = if (expanded) MaterialTheme.typography.displaySmall else MaterialTheme.typography.titleLarge) },
+                subtitle = { expanded -> if (expanded) Text("让国行版ColorOS更加Google", style = MaterialTheme.typography.titleMedium) },
+                collapsedHeight = TopAppBarDefaults.LargeAppBarCollapsedHeight,
+                expandedHeight = TopAppBarDefaults.LargeFlexibleAppBarWithSubtitleExpandedHeight,
+                actions = {
+                    IconButton(onClick = onRestart, enabled = restartEnabled) {
+                        MaterialControlIcon(ControlIcons.Restart, "重启作用域", restartEnabled)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = background, scrolledContainerColor = background),
+                windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                scrollBehavior = bar
+            )
+        },
+        content = content
+    )
+}
+
+@Composable
+private fun MaterialControlIcon(vector: ImageVector, description: String? = null, enabled: Boolean = true) {
     Icon(vector, contentDescription = description, modifier = Modifier.size(24.dp),
         tint = MaterialTheme.colorScheme.secondary.copy(alpha = if (enabled) 1f else 0.38f))
 }
 
 @Composable
 private fun Group(title: String, content: @Composable () -> Unit) {
-    Column(Modifier.padding(top = 24.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp), content = { content() })
+    val coui = LocalUiStyle.current == UiStyle.COUI
+    Column(Modifier.padding(top = if (coui) 16.dp else 24.dp)) {
+        if (coui) {
+            // The page already provides the outer 16 dp inset.
+            PreferenceCategory(title, marginStartType = PreferenceCategoryMarginStartType.Small)
+            CouiCard(modifier = Modifier.fillMaxWidth()) {
+                content()
+            }
+        } else {
+            Text(title, Modifier.padding(start = 16.dp, bottom = 8.dp),
+                style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) { content() }
+        }
     }
 }
 
 @Composable
-private fun SettingRow(index: Int, count: Int, icon: ImageVector, title: String, summary: String,
+private fun SettingRow(index: Int, count: Int, icon: ImageVector, title: String, summary: String, onClick: () -> Unit) {
+    if (LocalUiStyle.current == UiStyle.COUI) {
+        ArrowPreference(
+            title = title, summary = summary,
+            startAction = { CouiRowIcon(icon) },
+            cardListPosition = cardListPositionOf(index, count),
+            onClick = onClick
+        )
+    } else {
+        MaterialSettingRow(index, count, icon, title, summary, onClick)
+    }
+}
+
+@Composable
+internal fun MaterialSettingRow(index: Int, count: Int, icon: ImageVector, title: String, summary: String,
     onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier,
-    trailing: (@Composable () -> Unit)? = null) {
+    trailing: @Composable () -> Unit = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null) }) {
     SegmentedListItem(
         modifier = modifier.fillMaxWidth(),
         shapes = ListItemDefaults.segmentedShapes(index, count).let {
@@ -229,10 +367,16 @@ private fun SettingRow(index: Int, count: Int, icon: ImageVector, title: String,
         onClick = onClick,
         verticalAlignment = Alignment.CenterVertically,
         leadingContent = { Icon(icon, null, Modifier.size(24.dp)) },
-        trailingContent = trailing ?: { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null) },
+        trailingContent = trailing,
         supportingContent = { Text(summary) },
         content = { Text(title) }
     )
+}
+
+@Composable
+internal fun CouiRowIcon(icon: ImageVector, enabled: Boolean = true) {
+    val colors = COUITheme.colorScheme
+    CouiIcon(icon, null, Modifier.size(24.dp), tint = if (enabled) colors.primary else colors.disabledNeutral)
 }
 
 @Composable
@@ -246,18 +390,50 @@ private fun ToggleRow(index: Int, count: Int, icon: ImageVector, title: String, 
             showSaving = true
         }
     }
-    SettingRow(index, count, icon, title, if (showSaving) "正在保存…" else summary,
-        { if (checked != null && !saving) onChange(!checked) }, enabled && checked != null && !showSaving,
-        Modifier.semantics {
-            role = Role.Switch
-            if (saving) disabled()
-            stateDescription = if (saving) "正在保存" else
-                when (checked) { true -> "已开启"; false -> "已关闭"; null -> "正在读取" }
-        }) {
+    val shownSummary = if (showSaving) "正在保存…" else summary
+    val rowEnabled = enabled && checked != null && !showSaving
+    val toggle = { if (checked != null && !saving) onChange(!checked) }
+    val semantics = Modifier.semantics {
+        role = Role.Switch
+        if (saving || !rowEnabled) disabled()
+        if (checked != null) toggleableState = ToggleableState(checked)
+        stateDescription = if (saving) "正在保存" else
+            when (checked) { true -> "已开启"; false -> "已关闭"; null -> "正在读取" }
+    }
+    if (LocalUiStyle.current == UiStyle.COUI) {
+        if (checked == null) {
+            BasicComponent(
+                modifier = semantics,
+                title = title,
+                summary = summary,
+                startAction = { CouiRowIcon(icon, enabled = false) },
+                endActions = {
+                    Box(Modifier.size(CouiSwitchDefaults.TrackWidth, CouiSwitchDefaults.TrackHeight)
+                        .background(COUITheme.colorScheme.secondaryContainer, RoundedCornerShape(50)))
+                },
+                cardListPosition = cardListPositionOf(index, count),
+                enabled = false
+            )
+        } else {
+            SwitchLoadingPreference(
+                checked = checked,
+                onCheckedChange = { if (!saving) onChange(it) },
+                title = title,
+                modifier = semantics,
+                isLoading = showSaving,
+                summary = shownSummary,
+                startAction = { CouiRowIcon(icon, enabled) },
+                cardListPosition = cardListPositionOf(index, count),
+                enabled = enabled
+            )
+        }
+        return
+    }
+    MaterialSettingRow(index, count, icon, title, shownSummary, toggle, rowEnabled, semantics) {
         if (checked == null) {
             Box(Modifier.size(width = 52.dp, height = 32.dp).background(
                 MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(16.dp)))
-            return@SettingRow
+            return@MaterialSettingRow
         }
         Switch(
             checked = checked,
@@ -274,8 +450,12 @@ private fun ToggleRow(index: Int, count: Int, icon: ImageVector, title: String, 
 }
 
 @Composable
-private fun CoogleDialog(state: CoogleState, saving: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    if (state.dialog == DialogKind.NONE) return
+private fun CoogleDialog(current: CoogleState, saving: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val coui = LocalUiStyle.current == UiStyle.COUI
+    val visible = current.dialog != DialogKind.NONE
+    var closingContent by remember { mutableStateOf<CoogleState?>(null) }
+    val state = if (visible) current else if (coui) closingContent ?: return else return
+    if (coui && visible) SideEffect { closingContent = current }
     val title = when (state.dialog) {
         DialogKind.STATUS -> "模块状态"
         DialogKind.RESTART -> "重启作用域"
@@ -301,13 +481,44 @@ private fun CoogleDialog(state: CoogleState, saving: Boolean, onConfirm: () -> U
         DialogKind.HIDE_ICON -> "隐藏"
         else -> "知道了"
     }
+    val confirmEnabled = !state.busy && !state.restarting &&
+        (state.dialog != DialogKind.RESTART || !saving) &&
+        (state.dialog != DialogKind.STATUS || (state.connected == true && !state.scopePending && !state.companionChecking))
+    val dismiss = when (state.dialog) {
+        DialogKind.STATUS -> "关闭"
+        DialogKind.RESTART, DialogKind.HIDE_ICON -> "取消"
+        else -> null
+    }
+    if (coui) {
+        val bodyHeight = minOf(220.dp, LocalWindowInfo.current.containerDpSize.height * 0.35f)
+        WindowDialog(
+            show = visible,
+            title = title,
+            onDismissRequest = { if (visible) onDismiss() },
+            onDismissFinished = { closingContent = null }
+        ) {
+            CouiText(message, Modifier.fillMaxWidth().heightIn(max = bodyHeight)
+                .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 12.dp),
+                color = DialogDefaults.summaryColor(),
+                style = COUITheme.textStyles.bodyS)
+            DialogButtonBar(
+                negative = dismiss?.let { DialogButtonBarAction(it, onClick = { if (visible) onDismiss() }) },
+                positive = DialogButtonBarAction(confirm, enabled = confirmEnabled, onClick = { if (visible) onConfirm() })
+            )
+        }
+        return
+    }
+    val icon = when (state.dialog) {
+        DialogKind.INSTALLED -> Icons.Outlined.Extension
+        DialogKind.RESTART -> ControlIcons.Restart
+        DialogKind.HIDE_ICON -> Icons.Rounded.VisibilityOff
+        else -> Icons.Rounded.Info
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = MaterialTheme.shapes.extraLarge,
         icon = {
-            if (state.dialog == DialogKind.INSTALLED) Icon(Icons.Outlined.Extension, null)
-            else if (state.dialog == DialogKind.RESTART) ControlIcon(ControlIcons.Restart)
-            else Icon(if (state.dialog == DialogKind.HIDE_ICON) Icons.Rounded.VisibilityOff else Icons.Rounded.Info, null)
+            if (state.dialog == DialogKind.RESTART) MaterialControlIcon(icon) else Icon(icon, null)
         },
         title = { Text(title) },
         text = {
@@ -316,12 +527,8 @@ private fun CoogleDialog(state: CoogleState, saving: Boolean, onConfirm: () -> U
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm, enabled = !state.busy && !state.restarting &&
-                (state.dialog != DialogKind.RESTART || !saving) &&
-                (state.dialog != DialogKind.STATUS || (state.connected == true && !state.scopePending && !state.companionChecking))) { Text(confirm) }
+            TextButton(onClick = onConfirm, enabled = confirmEnabled) { Text(confirm) }
         },
-        dismissButton = if (state.dialog in setOf(DialogKind.STATUS, DialogKind.RESTART, DialogKind.HIDE_ICON)) {
-            { TextButton(onClick = onDismiss) { Text(if (state.dialog == DialogKind.STATUS) "关闭" else "取消") } }
-        } else null
+        dismissButton = dismiss?.let { label -> { TextButton(onClick = onDismiss) { Text(label) } } }
     )
 }

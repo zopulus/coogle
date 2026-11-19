@@ -6,6 +6,9 @@ Original commit: 1ce6ad3559c9c6ba33f8d8179b1ede55198961e2.
 Material UI conventions derive from tiann/KernelSU (GPL-3.0):
 https://github.com/tiann/KernelSU
 MaterialTheme.kt, ExpressiveDialog.kt, ExpressiveSwitch.kt and SegmentedList.kt informed the implementation.
+The Material 3 interface style selector adapts SettingsMaterial.kt, SegmentedList.kt and ExpressiveMenu.kt from KernelSU.
+The COUI interface uses suqi8/coui (Apache-2.0), based on Miuix by YuKongA and the compose-miuix-ui contributors.
+https://github.com/suqi8/coui
 AndroidX Compose/Activity/Core and Kotlin runtime are Apache-2.0 dependencies.
 libxposed API, interface and service are Apache-2.0 dependencies.
 Google-color-inspired C icons are custom artwork derived from the user supplied icon reference.
