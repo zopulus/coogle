@@ -9,7 +9,7 @@ final class FeatureScopes {
         return switch (feature) {
             case FeaturePolicy.HEY_GOOGLE -> List.of("system", GOOGLE);
             case FeaturePolicy.NAVIGATION -> List.of("system", "com.android.systemui", "com.android.settings", "com.android.launcher", GOOGLE);
-            case FeaturePolicy.SEARCH_BAR -> List.of("com.android.launcher");
+            case FeaturePolicy.SEARCH_BAR -> List.of("system", "com.android.launcher");
             case FeaturePolicy.GOOGLE_ENTRY -> List.of("com.android.settings");
             case FeaturePolicy.GMS -> List.of("system");
             case FeaturePolicy.LENS -> List.of(GOOGLE, "com.oplus.camera");

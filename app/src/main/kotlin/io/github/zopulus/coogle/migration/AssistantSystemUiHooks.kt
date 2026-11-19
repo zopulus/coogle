@@ -167,6 +167,15 @@ internal object AssistantSystemUiHooks {
                                 val type = bundle.getInt("invocation_type", 0)
                                 if (type != INVOCATION_TYPE_CIRCLE_TO_SEARCH &&
                                     type != INVOCATION_TYPE_CIRCLE_TO_SEARCH_ALTERNATE) return
+                                if (type == INVOCATION_TYPE_CIRCLE_TO_SEARCH &&
+                                    NativeCircleStart.usesDomesticBridge && NativeCircleStart.isGestureNavigation()) {
+                                    val context = systemContext ?: findSystemContext()
+                                    // The launcher already completed its animation for this entry.
+                                    if (context == null || !NativeCircleStart.permitsNow(context) || triggerCircleToSearchC17()) {
+                                        param.result = null
+                                    }
+                                    return
+                                }
                                 val manager = param.thisObject ?: return
                                 val activity = activityManager.get(manager) as? ActivityManager ?: return
                                 // Route every circle request before the assistant picker/metrics path.
@@ -235,6 +244,8 @@ internal object AssistantSystemUiHooks {
         }
     }
     private fun hookNativeCircleSystemUi(classLoader: ClassLoader) {
+        NativeCircleStart.install(classLoader)
+        if (!NativeCircleStart.usesDomesticBridge) return
         VisibleCircleGestureHooks.install(classLoader) {
             triggerCircleToSearchC17()
         }
@@ -299,18 +310,17 @@ internal object AssistantSystemUiHooks {
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         if (!LspConfig.isAssistantNativeCircleEnabledXposed()) return
-                        val context = systemContext ?: findContext(param.thisObject)
-                        if (!isGestureCircleToSearchEnabled(context)) return
+                        val context = systemContext ?: findContext(param.thisObject) ?: return
+                        if (!isGestureCircleToSearchEnabled(context) || !NativeCircleStart.isGestureNavigation()) return
                         if (VisibleCircleGestureHooks.isRegistered()) {
                             // The independent EXP-style listener owns this event now.
                             param.result = null
                             return
                         }
-                        if (triggerCircleToSearchC17()) {
-                            // Recognition, pointer pilfering and the launcher's press animation
-                            // have already run in C17. Suppress only the final Breeno/OCR action.
-                            param.result = null
-                        }
+                        NativeCircleStart.afterRecents(context, {
+                            LspConfig.isAssistantNativeCircleEnabledXposed() && isGestureCircleToSearchEnabled(context)
+                        }) { triggerCircleToSearchC17() }
+                        param.result = null
                     }
                 },
             )

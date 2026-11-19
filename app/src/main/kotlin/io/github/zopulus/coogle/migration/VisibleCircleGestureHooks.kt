@@ -47,8 +47,6 @@ internal object VisibleCircleGestureHooks {
                     .filter { it.name in names }
                     .forEach { ModernHookRuntime.requireModule().deoptimize(it) }
             }
-            val nav = ModernReflect.findClass("com.oplus.systemui.navigationbar.utils.NavBarUtils", loader)
-                .getDeclaredMethod("isGestureSideMode")
             val childrenClass = ModernReflect.findClass("com.oplusos.systemui.common.observer.ChildrenModeObserver", loader)
             val children = childrenClass.getMethod("getInstance").invoke(null)
             val childrenEnabled = ModernReflect.findField(childrenClass, "mIsChildrenMode")
@@ -68,9 +66,9 @@ internal object VisibleCircleGestureHooks {
                     val handler = Handler(Looper.getMainLooper())
                     fun isAllowed() = LspConfig.isAssistantNativeCircleEnabledXposed() &&
                         AssistantRuntime.isGestureCircleToSearchEnabled(context) &&
-                        nav.invoke(null) == true && !childrenEnabled.getBoolean(children)
+                        NativeCircleStart.isGestureNavigation() && !childrenEnabled.getBoolean(children)
                     val bridge = NativeCircleGestureListener(controller, touchEvent) {
-                        if (isAllowed()) dispatch()
+                        NativeCircleStart.afterRecents(context, ::isAllowed) { dispatch() }
                     }
                     fun refresh() {
                         bridge.update(isAllowed())

@@ -20,6 +20,7 @@ public final class CoogleModule extends XposedModule {
         if (!SystemCompatibility.isColorOs17()) return;
         MigrationEntry.attach(this);
         MigrationEntry.hookSystem(param.getClassLoader());
+        SearchBarFeatureHook.install(hooks, param.getClassLoader());
         SignalModelHooks.install(hooks, param.getClassLoader());
         hooks.info("SYSTEM native assistant and hotword initialization complete");
     }

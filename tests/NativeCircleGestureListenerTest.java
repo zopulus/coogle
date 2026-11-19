@@ -21,6 +21,16 @@ public final class NativeCircleGestureListenerTest {
         }
     }
     public static void main(String[] args) throws Exception {
+        if (!NativeCircleGestureListener.canStart(0L, false, false, false)) throw new AssertionError("Ordinary gesture blocked");
+        for (long restricted : new long[]{8, 64, 512, 4, 2048}) {
+            if (NativeCircleGestureListener.canStart(restricted, false, false, false))
+                throw new AssertionError("International SystemUI restriction omitted: " + restricted);
+        }
+        if (!NativeCircleGestureListener.canStart(1L << 41, false, false, false))
+            throw new AssertionError("Unrelated SystemUI flag blocked navigation");
+        if (NativeCircleGestureListener.canStart(0L, true, false, false)) throw new AssertionError("Minimized split screen launched");
+        if (NativeCircleGestureListener.canStart(0L, false, true, false)) throw new AssertionError("Restricted outer display launched");
+        if (!NativeCircleGestureListener.canStart(0L, false, true, true)) throw new AssertionError("Inner display incorrectly blocked");
         Controller controller = new Controller();
         AtomicInteger calls = new AtomicInteger();
         NativeCircleGestureListener bridge = new NativeCircleGestureListener(controller, TouchEvent.class, calls::incrementAndGet);

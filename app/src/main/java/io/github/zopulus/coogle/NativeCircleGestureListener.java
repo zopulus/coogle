@@ -5,6 +5,15 @@ import java.lang.reflect.Proxy;
 
 /** One listener in the existing SystemUI gesture controller, with no touch monitor. */
 public final class NativeCircleGestureListener {
+    // Masks read by the international SystemUI immediately before launching search.
+    private static final long LOCK_SCREEN = 584L;
+    private static final long NOTIFICATION_SHADE = 2052L;
+
+    public static boolean canStart(long flags, boolean splitMinimized, boolean foldRemapDisabled, boolean innerDisplay) {
+        return (flags & (LOCK_SCREEN | NOTIFICATION_SHADE)) == 0
+                && !splitMinimized && (!foldRemapDisabled || innerDisplay);
+    }
+
     private final Object controller, listener;
     private final Method add, remove;
     private volatile boolean registered;

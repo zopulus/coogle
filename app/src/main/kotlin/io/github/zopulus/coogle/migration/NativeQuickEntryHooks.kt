@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.os.Bundle
 import io.github.zopulus.coogle.NativeQuickEntryPolicy
+import io.github.zopulus.coogle.FeatureConfig
+import io.github.zopulus.coogle.FeaturePolicy
 import io.github.zopulus.coogle.migration.compat.ModernHookRuntime
 import io.github.zopulus.coogle.migration.compat.ModernMethodHook
 import io.github.zopulus.coogle.migration.compat.ModernReflect
@@ -26,19 +28,31 @@ internal object NativeQuickEntryHooks {
     private fun hookPicker(loader: ClassLoader) {
         val cls = ModernReflect.findClass("com.oplus.keyguard.settings.AffordanceActivity\$SettingsFragment", loader)
         val getResources = ModernReflect.findMethodExact(cls, "getResources", emptyArray())
+        val getContext = ModernReflect.findMethodExact(cls, "getContext", emptyArray())
+        val snapApp = runCatching {
+            val type = ModernReflect.findClass(
+                "com.oplus.systemui.keyguard.data.quickaffordance.snapchat.SnapchatAppData", loader)
+            val instance = ModernReflect.findField(type, "INSTANCE").get(null)
+            val support = ModernReflect.findMethodExact(type, "isSupportShortCut", arrayOf(Context::class.java))
+            val check: (Context) -> Boolean = { support.invoke(instance, it) == true }
+            check
+        }.getOrNull()
         val create = ModernReflect.findMethodExact(cls, "onCreatePreferences", arrayOf(Bundle::class.java, String::class.java))
         val getArray = Resources::class.java.getDeclaredMethod("getStringArray", Int::class.javaPrimitiveType)
         val module = ModernHookRuntime.requireModule()
         module.hook(create).intercept { chain ->
+            if (!FeatureConfig.enabled(FeaturePolicy.QUICK_ENTRIES)) return@intercept chain.proceed()
             val resources = getResources.invoke(chain.thisObject) as Resources
             val id = resources.getIdentifier("config_keyguardQuickAffordanceKey", "array", "com.android.systemui")
             if (id == 0) return@intercept chain.proceed()
+            val context = getContext.invoke(chain.thisObject) as? Context
+            val snapAvailable = context != null && runCatching { snapApp?.invoke(context) == true }.getOrDefault(false)
             // This resource hook exists only while the native picker is being built.
             val handle = module.hook(getArray).intercept { read ->
                 val result = read.proceed()
                 if (read.thisObject === resources && read.args[0] == id) {
                     @Suppress("UNCHECKED_CAST")
-                    NativeQuickEntryPolicy.completeLockscreenEntries(result as Array<String>)
+                    NativeQuickEntryPolicy.completeLockscreenEntries(result as Array<String>, snapAvailable)
                 } else result
             }
             try { chain.proceed() } finally { handle.unhook() }
@@ -52,6 +66,7 @@ internal object NativeQuickEntryHooks {
         val getUserId = ModernReflect.findMethodExact(hostField.type, "getUserId", emptyArray())
         ModernReflect.findAndHookMethod(cls, "isAvailable", emptyArray(), object : ModernMethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {
+                if (!FeatureConfig.enabled(FeaturePolicy.QUICK_ENTRIES)) return
                 val tile = param.thisObject ?: return
                 val context = contextField.get(tile) as Context
                 val pm = context.packageManager
@@ -70,6 +85,7 @@ internal object NativeQuickEntryHooks {
         val cameraAvailable = ModernReflect.findMethodExact(controllerField.type, "isCameraAvailable", emptyArray())
         ModernReflect.findAndHookMethod(cls, "isAvailable", emptyArray(), object : ModernMethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {
+                if (!FeatureConfig.enabled(FeaturePolicy.QUICK_ENTRIES)) return
                 val tile = param.thisObject ?: return
                 param.result = cameraAvailable.invoke(controllerField.get(tile))
             }
