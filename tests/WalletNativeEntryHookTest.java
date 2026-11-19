@@ -11,11 +11,20 @@ import java.util.List;
 
 /** The module must only suppress the duplicate vendor route after native Wallet is selected. */
 public final class WalletNativeEntryHookTest {
+    private static final class LegacyPolicy { boolean mShutdownChordEnabled; }
+
     public static void main(String[] args) throws Throwable {
         boolean[] enabled = {true};
         FeatureConfig.attach((SharedPreferences) Proxy.newProxyInstance(SharedPreferences.class.getClassLoader(),
                 new Class<?>[]{SharedPreferences.class}, (p, m, a) -> m.getName().equals("getBoolean") ? enabled[0] : null));
         Class<?> owner = Class.forName("io.github.zopulus.coogle.migration.WalletPowerHooks");
+        @SuppressWarnings("unchecked")
+        var legacyGate = (java.util.function.Predicate<Object>) owner.getMethod("bindRegionGate", Class.class)
+                .invoke(null, LegacyPolicy.class);
+        var legacy = new LegacyPolicy();
+        check(legacyGate.test(legacy), "Older firmware no longer recognizes the regional gate");
+        legacy.mShutdownChordEnabled = true;
+        check(!legacyGate.test(legacy), "Older firmware overrode an unrelated rejection");
         owner.getMethod("hook", ClassLoader.class).invoke(owner.getField("INSTANCE").get(null), WalletNativeEntryHookTest.class.getClassLoader());
         Method method = OplusWalletController.class.getMethod("isQuickLaunchSupport");
         var module = ModernHookRuntime.INSTANCE.module;
@@ -40,6 +49,8 @@ public final class WalletNativeEntryHookTest {
         enabled[0] = true;
         check(invoke(gate, gateMethod, policy, false).equals(true), "CN region gate still blocks selected native Wallet");
         check(GestureLauncherService.queriedUser == 11, "Power gate used wallet-controller user instead of policy user");
+        policy.mPowerButtonRedefineFeatureEnabled = true;
+        check(invoke(gate, gateMethod, policy, false).equals(true), "New firmware's domestic market gate still blocks Wallet");
         GestureLauncherService.selected = false;
         check(invoke(gate, gateMethod, policy, false).equals(false), "Power gate enabled an unselected native gesture");
         queried = GestureLauncherService.queries;
@@ -51,15 +62,17 @@ public final class WalletNativeEntryHookTest {
         PhoneWindowManagerExtImpl.sSosPowerKeyDownCount = 3;
         check(invoke(gate, gateMethod, policy, false).equals(false) && GestureLauncherService.queries == queried,
                 "Native Wallet bypassed three-press SOS restriction");
+        check(invoke(hook, method, controller, true).equals(true) && GestureLauncherService.queries == queried,
+                "Vendor fallback was suppressed while SOS blocks the native route");
         PhoneWindowManagerExtImpl.sSosPowerKeyDownCount = 5;
-        policy.mShutdownChordEnabled = true;
+        policy.mIsOneplusExp = true;
         check(invoke(gate, gateMethod, policy, false).equals(false) && GestureLauncherService.queries == queried,
                 "An unrelated original rejection was overridden");
         check(invoke(gate, gateMethod, policy, true).equals(true) && GestureLauncherService.queries == queried,
                 "Already enabled native gate was altered");
-        check(policy.mShutdownChordEnabled && PhoneWindowManagerExtImpl.sSosPowerKeyDownCount == 5,
+        check(policy.mIsOneplusExp && policy.mPowerButtonRedefineFeatureEnabled && PhoneWindowManagerExtImpl.sSosPowerKeyDownCount == 5,
                 "Power/SOS fields were changed");
-        policy.mShutdownChordEnabled = false;
+        policy.mIsOneplusExp = false;
         policy.mContext = null;
         check(invoke(gate, gateMethod, policy, false).equals(false), "Missing policy context opened native gate");
         policy.mContext = new android.content.Context();

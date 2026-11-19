@@ -7,9 +7,26 @@ import io.github.zopulus.coogle.migration.compat.ModernMethodHook
 import io.github.zopulus.coogle.migration.compat.ModernHookBridge
 import io.github.zopulus.coogle.migration.compat.ModernReflect
 import java.lang.reflect.Modifier
+import java.util.function.Predicate
 
 /** Allow the selected native gesture through the CN region gate and prevent duplicate dispatch. */
 internal object WalletPowerHooks {
+    @JvmStatic
+    fun bindRegionGate(policy: Class<*>): Predicate<Any> {
+        fun booleanField(name: String) = ModernReflect.findField(policy, name).also {
+            require(it.type == Boolean::class.javaPrimitiveType && !Modifier.isStatic(it.modifiers))
+        }
+        val redefine = try {
+            booleanField("mPowerButtonRedefineFeatureEnabled")
+        } catch (_: NoSuchFieldException) {
+            val legacy = booleanField("mShutdownChordEnabled")
+            return Predicate { !legacy.getBoolean(it) }
+        }
+        // Current ColorOS requires both the export variant and the redefine feature.
+        val export = booleanField("mIsOneplusExp")
+        return Predicate { !export.getBoolean(it) || !redefine.getBoolean(it) }
+    }
+
     fun hook(loader: ClassLoader) {
         runCatching {
             val target = ModernReflect.findClass("com.android.server.policy.OplusWalletController", loader)
@@ -26,11 +43,10 @@ internal object WalletPowerHooks {
             val policy = ModernReflect.findClass("com.android.server.policy.PhoneWindowManagerExtImpl", loader)
             val policyContext = ModernReflect.findField(policy, "mContext")
             val policyUser = ModernReflect.findField(policy, "mCurrentUserId")
-            val shutdownChord = ModernReflect.findField(policy, "mShutdownChordEnabled")
+            val regionGate = bindRegionGate(policy)
             val sosCount = ModernReflect.findField(policy, "sSosPowerKeyDownCount")
             require(Context::class.java.isAssignableFrom(policyContext.type))
             require(policyUser.type == Int::class.javaPrimitiveType)
-            require(shutdownChord.type == Boolean::class.javaPrimitiveType && !Modifier.isStatic(shutdownChord.modifiers))
             require(sosCount.type == Int::class.javaPrimitiveType && Modifier.isStatic(sosCount.modifiers))
             require(ModernReflect.findMethodExact(policy, "isCameraGestureEnabled", emptyArray()).returnType == Boolean::class.javaPrimitiveType)
             ModernHookBridge.atomic {
@@ -40,7 +56,7 @@ internal object WalletPowerHooks {
                             if (param.result != false || !FeatureConfig.enabled(FeaturePolicy.WALLET)) return
                             val windowPolicy = param.thisObject ?: return
                             // Fill only the missing regional capability; keep the original three-press SOS exclusion.
-                            if (shutdownChord.getBoolean(windowPolicy) || sosCount.getInt(null) == 3) return
+                            if (sosCount.getInt(null) == 3 || !regionGate.test(windowPolicy)) return
                             val context = policyContext.get(windowPolicy) as? Context ?: return
                             if (nativeSelected.invoke(null, context, policyUser.getInt(windowPolicy)) == true) param.result = true
                         }
@@ -50,6 +66,7 @@ internal object WalletPowerHooks {
                     object : ModernMethodHook() {
                         override fun afterHookedMethod(param: MethodHookParam) {
                             if (param.result != true || !FeatureConfig.enabled(FeaturePolicy.WALLET)) return
+                            if (sosCount.getInt(null) == 3) return
                             val wallet = param.thisObject ?: return
                             val context = contextField.get(wallet) as? Context ?: return
                             val userId = userField.getInt(wallet)
