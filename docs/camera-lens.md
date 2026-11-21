@@ -1,6 +1,6 @@
 # ColorOS camera Lens integration (experimental)
 
-This integration runs by default in the Camera and Google LSPosed scopes. There is no Camera Lens switch or new settings description; former `camera_lens=false` preferences are ignored. Enable the `com.oplus.camera` and Google scopes, then restart both apps. The existing Google Lens settings switch and companion module remain independent.
+The 「相机相册智能镜头」 switch under 「系统设置」→「Google 智能镜头」 controls the Camera and Gallery integrations. Upgrading from the original Lens switch copies its state into the shared switch. The required LSPosed scopes are Camera (`com.oplus.camera`), Photos (`com.coloros.gallery3d`), and the Google App. Restart these apps after changing the switch.
 
 ## Inspected native sources
 
@@ -10,12 +10,10 @@ DexKit anchors the native menu using the option key and `com.oplus.camera.featur
 
 The hook restores only the missing `common` branch of the CN native presenter. It calls the camera's existing support, children-mode, initialization, normal-entry and front-camera APIs. Lock eligibility follows the inspected international conjunction: deny when the native device-lock getter and native secure UI flag are both true. Unlocking within the same secure-camera session can therefore recover eligibility. Other mode branches execute the original presenter. Native event handlers still control visibility during capture/recording; native menu/click handling still controls launch and statistics. No separate Intent whitelist, Activity-field guessing, PackageManager lookup or module-defined mode/lock policy remains.
 
-Google 17.66.11's inspected native Lens gateway checks OEM eligibility using `com.google.lens.feature.CAMERA_INTEGRATION` and `ro.com.google.lens.oem_camera_package`. Both are absent on the tested CN phone. Google-process-only framework hooks expose the feature and append `com.oplus.camera` to the package declaration. Other features/properties and existing package entries retain their original values. No global system property or companion file is changed.
+Google 17.66.11's inspected native Lens gateway checks OEM eligibility using `com.google.lens.feature.CAMERA_INTEGRATION` and `ro.com.google.lens.oem_camera_package`. Both are absent on the tested CN phone. With the switch enabled, Google-process-only hooks expose the feature at version 0 and append `com.oplus.camera` to the package declaration. Existing package entries retain their original values.
 
 ## Verification
 
-`testHookLifecycle` includes the native presenter callback (children/support/entry predicates, front-camera denial, native lock/UI conjunction, unlock recovery, original modes, missing state and incompatible binding), former-cache migration, and Google OEM declaration tests. Presenter and OEM tests verify that saved false preferences do not disable the integration and callbacks never read the former switch. Removing the children-mode guard was rejected by the regression test. `tests/run_camera_dex_test.py` executes the production locator and binding against supplied APKs without installing an application or changing phone settings. Both extracted Camera APKs passed, including cached descriptors; this does not establish live UI behavior for the revised hook.
-
-Device test: the initial menu hook launched `LensDeeplink`, which immediately finished. After adding the OEM eligibility declaration and restarting Camera/Google, the user confirmed successful Lens UI launch on the CN OnePlus 15.
+Both inspected Camera APKs passed native locator and binding checks, including reuse of cached descriptors. After adding the OEM eligibility declaration and restarting Camera and Google, the user confirmed that Lens opens from Camera on the CN OnePlus 15.
 
 Future camera builds must retain the native anchors, named presenter APIs, normal-entry instruction shape and typed secure UI field `EventMessageUIContainerContext.b`. Ambiguous lookup or incompatible binding retains original camera behavior. Google may change its OEM declaration mechanism; universal update compatibility is not claimed.

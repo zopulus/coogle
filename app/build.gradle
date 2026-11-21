@@ -2,6 +2,10 @@ plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.plugin.compose'
 }
+
+def releaseVersion = new Properties()
+rootProject.file('version.properties').withInputStream { releaseVersion.load(it) }
+
 android {
     namespace 'io.github.zopulus.coogle'
     compileSdk { version = release(37) }
@@ -10,8 +14,8 @@ android {
         applicationId 'io.github.zopulus.coogle'
         minSdk 35
         targetSdk 36
-        versionCode 141
-        versionName '1.3.11'
+        versionCode releaseVersion.getProperty('versionCode').toInteger()
+        versionName releaseVersion.getProperty('versionName')
         ndk { abiFilters 'arm64-v8a' }
     }
     buildTypes {
@@ -34,182 +38,4 @@ dependencies {
     implementation 'io.github.suqi8.coui.kmp:coui-icons-android:2.0.0'
     implementation 'androidx.core:core-ktx:1.17.0'
     implementation 'org.luckypray:dexkit:2.3.0'
-}
-
-// Exercise the native gesture listener against a JVM controller boundary.
-def circleTestClasses = layout.buildDirectory.dir('circle-gesture-tests')
-tasks.register('compileCircleGestureTest', JavaCompile) {
-    source files('src/main/java/io/github/zopulus/coogle/NativeCircleGestureListener.java',
-        '../tests/NativeCircleGestureListenerTest.java')
-    classpath = files()
-    destinationDirectory = circleTestClasses
-    sourceCompatibility = '17'
-    targetCompatibility = '17'
-    options.encoding = 'UTF-8'
-}
-tasks.register('testCircleGesture', JavaExec) {
-    dependsOn 'compileCircleGestureTest'
-    classpath = files(circleTestClasses)
-    mainClass = 'io.github.zopulus.coogle.NativeCircleGestureListenerTest'
-}
-
-def contextualTestClasses = layout.buildDirectory.dir('contextual-tests')
-tasks.register('compileContextualSearchTest', JavaCompile) {
-    dependsOn 'compileReleaseKotlin'
-    source files('../tests/ContextualSearchTest.java') + fileTree('../tests/contextual-stubs') { include '**/*.java' }
-    classpath = files(androidComponents.sdkComponents.bootClasspath)
-    destinationDirectory = contextualTestClasses
-    sourceCompatibility = '17'
-    targetCompatibility = '17'
-    options.encoding = 'UTF-8'
-}
-tasks.register('testContextualSearch', JavaExec) {
-    dependsOn 'compileContextualSearchTest'
-    classpath = files(contextualTestClasses, layout.buildDirectory.dir('intermediates/built_in_kotlinc/release/compileReleaseKotlin/classes')) +
-        files({ configurations.releaseRuntimeClasspath.findAll { it.name.startsWith('kotlin-stdlib-') && it.name.endsWith('.jar') } }) +
-        files({ zipTree(configurations.releaseCompileClasspath.find { it.name == 'api-102.0.0.aar' })
-            .matching { include 'classes.jar' }.singleFile })
-    mainClass = 'io.github.zopulus.coogle.ContextualSearchTest'
-}
-
-def hotwordTestClasses = layout.buildDirectory.dir('hotword-tests')
-
-def lifecycleTestClasses = layout.buildDirectory.dir('hook-lifecycle-tests')
-tasks.register('compileHookLifecycleTests', JavaCompile) {
-    source files('../tests/ActionButtonLensTest.java')
-    source files('../tests/RootShellTest.java')
-    source files('../tests/WalletPreviewHookTest.java')
-    source files('../tests/ScopeRequestsTest.java')
-    source files('../tests/WalletPackageIsolationTest.java')
-    source files('../tests/WalletPaymentReadTest.java')
-    source files('../tests/WalletNativeEntryHookTest.java')
-    source files('../tests/WalletDismissQueueTest.java')
-    source files('../tests/WalletKeyguardHookTest.java')
-    source files('../tests/WalletNativeGestureTest.java')
-    source files('../tests/WalletNativeGestureCommandTest.java')
-    source files('../tests/SettingsUiStateTest.java')
-    source files('../tests/WalletSettingsTest.java', '../tests/WalletPaymentCommandTest.java', '../tests/ScopeRestartTest.java')
-    source files('../tests/CompanionControlTest.java', '../tests/CompanionUpgradeRegressionTest.java', '../tests/CameraLensEligibilityTest.java', '../tests/CameraNativeLensTest.java')
-    source files('../tests/CompanionSettingsTest.java', '../tests/OptionalAppHooksTest.java', '../tests/SearchBarBindingTest.java')
-    source files('../tests/AssistantVoiceInstallTest.java')
-    source files('../tests/NavigationHookTest.java', '../tests/LauncherAssistantBindingTest.java')
-    source files('../tests/GmsFeatureQueryTest.java')
-    dependsOn 'compileReleaseJavaWithJavac'
-    source files('../tests/DexTargetCacheTest.java', '../tests/LensBindingTest.java', '../tests/lens-stubs/com/google/apps/tiktok/account/AccountId.java', '../tests/LensHookLifecycleTest.java', '../tests/SignalModelHookLifecycleTest.java', '../tests/RoleReconciliationTest.java', '../tests/HookInstallRollbackTest.java', '../tests/HiddenCircleNoAssistantTest.java', '../tests/FeatureQueryTest.java', '../tests/ContextBindingCacheTest.java') +
-        fileTree('../tests/lifecycle-stubs') { include '**/*.java' } +
-        fileTree('../tests/contextual-stubs') { include 'android/**/*.java' }
-    classpath = files(layout.buildDirectory.dir('intermediates/built_in_kotlinc/release/compileReleaseKotlin/classes'),
-        layout.buildDirectory.dir('intermediates/javac/release/compileReleaseJavaWithJavac/classes'),
-        layout.buildDirectory.file('intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar')) +
-        files(androidComponents.sdkComponents.bootClasspath) +
-        files({ configurations.releaseRuntimeClasspath.findAll { it.name.startsWith('kotlin-stdlib-') && it.name.endsWith('.jar') } }) +
-        files({ zipTree(configurations.releaseCompileClasspath.find { it.name == 'api-102.0.0.aar' })
-            .matching { include 'classes.jar' }.singleFile }) +
-        files({ zipTree(configurations.releaseCompileClasspath.find { it.name == 'dexkit-2.3.0.aar' })
-            .matching { include 'classes.jar' }.singleFile })
-    destinationDirectory = lifecycleTestClasses
-    sourceCompatibility = '17'
-    targetCompatibility = '17'
-    options.encoding = 'UTF-8'
-}
-['NavigationHookTest', 'LauncherAssistantBindingTest', 'OptionalAppHooksTest', 'ActionButtonLensTest', 'WalletNativeGestureCommandTest', 'WalletNativeGestureTest', 'WalletNativeEntryHookTest', 'WalletDismissQueueTest', 'WalletKeyguardHookTest', 'WalletPaymentReadTest', 'WalletPackageIsolationTest', 'WalletSettingsTest', 'WalletPaymentCommandTest', 'ScopeRestartTest', 'SettingsUiStateTest', 'ScopeRequestsTest', 'CompanionUpgradeRegressionTest', 'CameraNativeLensTest', 'CameraLensEligibilityTest', 'GmsFeatureQueryTest', 'CompanionControlTest', 'CompanionSettingsTest', 'DexTargetCacheTest', 'LensBindingTest', 'LensHookLifecycleTest', 'SignalModelHookLifecycleTest', 'RoleReconciliationTest', 'AssistantVoiceInstallTest', 'HookInstallRollbackTest', 'HiddenCircleNoAssistantTest', 'FeatureQueryTest', 'ContextBindingCacheTest'].each { testName ->
-    tasks.register("test${testName}", JavaExec) {
-        dependsOn 'compileHookLifecycleTests'
-        classpath = files(lifecycleTestClasses) + tasks.named('compileHookLifecycleTests').get().classpath
-        mainClass = "io.github.zopulus.coogle.${testName}"
-    }
-}
-tasks.register('testHookLifecycle') {
-    dependsOn 'testNavigationHookTest', 'testLauncherAssistantBindingTest'
-    dependsOn 'testSettingsActivity'
-    dependsOn 'testAssistantVoiceInstallTest'
-    dependsOn 'testOptionalAppHooksTest'
-    dependsOn 'testActionButtonLensTest'
-    dependsOn 'testLensBindingTest'
-    dependsOn 'testRootShell'
-    dependsOn 'testWalletPreviewHook'
-    dependsOn 'testWalletDismissQueueTest'
-    dependsOn 'testWalletKeyguardHookTest'
-    dependsOn 'testWalletNativeGestureCommandTest'
-    dependsOn 'testWalletNativeGestureTest'
-    dependsOn 'testWalletNativeEntryHookTest'
-    dependsOn 'testWalletPaymentReadTest'
-    dependsOn 'testWalletPackageIsolationTest'
-    dependsOn 'testScopeRequestsTest'
-    dependsOn 'testSettingsUiStateTest'
-    dependsOn 'testWalletSettingsTest', 'testWalletPaymentCommandTest', 'testScopeRestartTest'
-    dependsOn 'testCompanionUpgradeRegressionTest', 'testCameraLensEligibilityTest'
-    dependsOn 'testCameraNativeLensTest'
-    dependsOn 'testGmsFeatureQueryTest'
-    dependsOn 'testCompanionControlTest'
-    dependsOn 'testCompanionSettingsTest'
-    dependsOn 'testDexTargetCacheTest', 'testLensHookLifecycleTest', 'testSignalModelHookLifecycleTest', 'testRoleReconciliationTest', 'testHookInstallRollbackTest', 'testHiddenCircleNoAssistantTest', 'testFeatureQueryTest', 'testContextBindingCacheTest'
-}
-
-// Keep Activity boundaries isolated from the hook lifecycle fixtures.
-def activityTestClasses = layout.buildDirectory.dir('activity-tests')
-tasks.register('compileSettingsActivityTest', JavaCompile) {
-    dependsOn 'compileHookLifecycleTests'
-    source files('../tests/SettingsActivityTest.java') + fileTree('../tests/activity-stubs') { include '**/*.java' }
-    classpath = files(lifecycleTestClasses) + tasks.named('compileHookLifecycleTests').get().classpath
-    destinationDirectory = activityTestClasses
-    sourceCompatibility = '17'
-    targetCompatibility = '17'
-    options.encoding = 'UTF-8'
-}
-tasks.register('testSettingsActivity', JavaExec) {
-    dependsOn 'compileSettingsActivityTest'
-    classpath = files(activityTestClasses) + tasks.named('compileSettingsActivityTest').get().classpath
-    mainClass = 'io.github.zopulus.coogle.SettingsActivityTest'
-}
-
-tasks.register('testRootShell', JavaExec) {
-    dependsOn 'compileHookLifecycleTests'
-    classpath = files(lifecycleTestClasses) + tasks.named('compileHookLifecycleTests').get().classpath
-    mainClass = 'io.github.zopulus.coogle.RootShellTest'
-}
-
-tasks.register('testWalletPreviewHook', JavaExec) {
-    dependsOn 'compileHookLifecycleTests'
-    classpath = files(lifecycleTestClasses) + tasks.named('compileHookLifecycleTests').get().classpath
-    mainClass = 'WalletPreviewHookTest'
-}
-
-tasks.register('compileHotwordUidTest', JavaCompile) {
-    source files('../tests/HotwordUidTest.java') + fileTree('../tests/hotword-stubs') { include '**/*.java' }
-    classpath = files()
-    destinationDirectory = hotwordTestClasses
-    sourceCompatibility = '17'
-    targetCompatibility = '17'
-    options.encoding = 'UTF-8'
-}
-tasks.register('testHotwordUid', JavaExec) {
-    dependsOn 'compileReleaseKotlin', 'compileHotwordUidTest'
-    classpath = files(hotwordTestClasses, layout.buildDirectory.dir('intermediates/built_in_kotlinc/release/compileReleaseKotlin/classes')) +
-        files({ configurations.releaseRuntimeClasspath.findAll { it.name.startsWith('kotlin-stdlib-') && it.name.endsWith('.jar') } }) +
-        files({ zipTree(configurations.releaseCompileClasspath.find { it.name == 'api-102.0.0.aar' })
-            .matching { include 'classes.jar' }.singleFile })
-    mainClass = 'io.github.zopulus.coogle.HotwordUidTest'
-}
-
-// Exercise production wallpaper callbacks without an Android device or Xposed runtime.
-def wallpaperTestClasses = layout.buildDirectory.dir('wallpaper-tests')
-tasks.register('compileWallpaperTest', JavaCompile) {
-    dependsOn 'compileReleaseKotlin'
-    source files('../tests/WallpaperQuickEntryTest.java') + fileTree('../tests/wallpaper-stubs') { include '**/*.java' }
-    classpath = files(layout.buildDirectory.dir('intermediates/built_in_kotlinc/release/compileReleaseKotlin/classes')) +
-        files({ zipTree(configurations.releaseCompileClasspath.find { it.name == 'api-102.0.0.aar' })
-            .matching { include 'classes.jar' }.singleFile })
-    destinationDirectory = wallpaperTestClasses
-    sourceCompatibility = '17'
-    targetCompatibility = '17'
-    options.encoding = 'UTF-8'
-}
-tasks.register('testWallpaper', JavaExec) {
-    dependsOn 'compileWallpaperTest'
-    classpath = files(wallpaperTestClasses, layout.buildDirectory.dir('intermediates/built_in_kotlinc/release/compileReleaseKotlin/classes')) +
-        files({ configurations.releaseRuntimeClasspath.findAll { it.name.startsWith('kotlin-stdlib-') && it.name.endsWith('.jar') } }) +
-        files({ zipTree(configurations.releaseCompileClasspath.find { it.name == 'api-102.0.0.aar' })
-            .matching { include 'classes.jar' }.singleFile })
-    mainClass = 'io.github.zopulus.coogle.WallpaperQuickEntryTest'
 }

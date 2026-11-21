@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <queries>
         <intent><action android:name="android.intent.action.ASSIST" /></intent>
         <intent><action android:name="android.service.voice.VoiceInteractionService" /></intent>
@@ -20,6 +21,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
-        <provider android:name="io.github.libxposed.service.XposedProvider" android:authorities="io.github.zopulus.coogle.XposedService" android:exported="true" />
+        <provider android:name="io.github.libxposed.service.XposedProvider" tools:node="remove" />
+        <provider android:name="io.github.libxposed.service.CoogleXposedProvider" android:authorities="io.github.zopulus.coogle.XposedService" android:exported="true" />
     </application>
 </manifest>

@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         uiStyle = UiStyle.fromPreference(uiCache.getString("ui_style", null))
         val cached = if (uiCache.getBoolean("features_saved", false))
-            CoogleState.featureKeys.associateWith { uiCache.getBoolean(it, FeaturePolicy.defaultValue(it)) } else emptyMap()
+            CoogleState.featureKeys.associateWith { FeatureConfig.requested(uiCache, it) } else emptyMap()
         val companion = runCatching { CompanionState.valueOf(uiCache.getString("companion", "UNKNOWN")!!) }
             .getOrDefault(CompanionState.UNKNOWN)
         state = state.copy(features = cached, companion = companion,
@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
 
     private fun syncPreferences() {
         val settings = preferences ?: return
-        runCatching { CoogleState.featureKeys.associateWith { settings.getBoolean(it, FeaturePolicy.defaultValue(it)) } }
+        runCatching { CoogleState.featureKeys.associateWith { FeatureConfig.requested(settings, it) } }
             .onSuccess { values ->
                 state = state.copy(connected = true, features = values)
                 uiCache.edit {
@@ -161,7 +161,7 @@ class MainActivity : ComponentActivity() {
                     WalletSettings.save(enabled, settings.getBoolean(key, false), WalletPayment(applicationContext), WalletNativeGesture(applicationContext)) { value ->
                         settings.edit().putBoolean(key, value).commit()
                     }
-                } else if (!settings.edit().putBoolean(key, enabled).commit()) {
+                } else if (!FeatureConfig.save(settings, key, enabled)) {
                     throw IOException("配置未保存，请检查 LSPosed 连接。")
                 }
             }

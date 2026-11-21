@@ -4,6 +4,13 @@
 
 package io.github.zopulus.coogle.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -25,6 +32,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -36,6 +44,7 @@ import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.DashboardCustomize
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SettingsSuggest
@@ -64,6 +73,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
@@ -80,12 +90,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.github.zopulus.coogle.BuildConfig
 import io.github.zopulus.coogle.FeaturePolicy
 import io.github.zopulus.coogle.R
 import kotlinx.coroutines.delay
 import io.github.suqi8.coui.kmp.basic.BasicComponent
+import io.github.suqi8.coui.kmp.anim.COUIMoveEaseEasing
 import io.github.suqi8.coui.kmp.basic.COUIScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Card as CouiCard
 import io.github.suqi8.coui.kmp.basic.CardListPosition
@@ -99,6 +111,8 @@ import io.github.suqi8.coui.kmp.basic.TagViewDefaults
 import io.github.suqi8.coui.kmp.basic.Text as CouiText
 import io.github.suqi8.coui.kmp.basic.TopAppBar as CouiTopAppBar
 import io.github.suqi8.coui.kmp.basic.cardListPositionOf
+import io.github.suqi8.coui.kmp.icon.COUIIcons
+import io.github.suqi8.coui.kmp.icon.extended.Back
 import io.github.suqi8.coui.kmp.layout.DialogButtonBar
 import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
 import io.github.suqi8.coui.kmp.preference.ArrowPreference
@@ -109,6 +123,8 @@ import io.github.suqi8.coui.kmp.theme.COUITheme
 import io.github.suqi8.coui.kmp.utils.scrollEndHaptic
 import io.github.suqi8.coui.kmp.layout.DialogDefaults
 import io.github.suqi8.coui.kmp.window.WindowDialog
+
+private const val LENS_SETTINGS_TITLE = "Google 智能镜头"
 
 @Composable
 fun CoogleScreen(
@@ -125,10 +141,34 @@ fun CoogleScreen(
     onRestart: () -> Unit,
     onUiStyle: (UiStyle) -> Unit
 ) {
-    val scrollState = rememberScrollState()
+    var lensSettingsOpened by rememberSaveable { mutableStateOf(false) }
+    val homeScrollState = rememberScrollState()
+    val restartEnabled = state.connected == true && !state.busy && !state.restarting && !state.scopePending && savingKeys.isEmpty()
+    val closeLensSettings = { lensSettingsOpened = false }
+    BackHandler(enabled = lensSettingsOpened && state.dialog == DialogKind.NONE, onBack = closeLensSettings)
     CoogleTheme(style) {
-        CoogleContent(state, savingKeys, onSetting, onAssistant, onIconVisibility, onStatus,
-            onAbout, onDialogConfirm, onDialogDismiss, onRestart, onUiStyle, scrollState)
+        val materialMotion = MaterialTheme.motionScheme
+        AnimatedContent(
+            targetState = lensSettingsOpened,
+            transitionSpec = {
+                val direction = if (targetState) AnimatedContentTransitionScope.SlideDirection.Start
+                    else AnimatedContentTransitionScope.SlideDirection.End
+                val position = if (style == UiStyle.COUI) tween<IntOffset>(285, easing = COUIMoveEaseEasing)
+                    else materialMotion.defaultSpatialSpec<IntOffset>()
+                val opacity = if (style == UiStyle.COUI) tween<Float>(165) else materialMotion.fastEffectsSpec<Float>()
+                (slideIntoContainer(direction, position) { it / 5 } + fadeIn(opacity))
+                    .togetherWith(slideOutOfContainer(direction, position) { it / 5 } + fadeOut(opacity))
+            },
+            label = "settings destination"
+        ) { showLensSettings ->
+            if (showLensSettings) {
+                LensSettingsContent(state, savingKeys, onSetting, restartEnabled, onRestart, closeLensSettings)
+            } else {
+                CoogleContent(state, savingKeys, onSetting, onAssistant, onIconVisibility, onStatus,
+                    onAbout, restartEnabled, onRestart, onUiStyle, { lensSettingsOpened = true }, homeScrollState)
+            }
+        }
+        CoogleDialog(state, savingKeys.isNotEmpty(), onDialogConfirm, onDialogDismiss)
     }
 }
 
@@ -141,14 +181,13 @@ private fun CoogleContent(
     onIconVisibility: (Boolean) -> Unit,
     onStatus: () -> Unit,
     onAbout: () -> Unit,
-    onDialogConfirm: () -> Unit,
-    onDialogDismiss: () -> Unit,
+    restartEnabled: Boolean,
     onRestart: () -> Unit,
     onUiStyle: (UiStyle) -> Unit,
+    onLensSettings: () -> Unit,
     scrollState: ScrollState
 ) {
     val coui = LocalUiStyle.current == UiStyle.COUI
-    val restartEnabled = state.connected == true && !state.busy && !state.restarting && !state.scopePending && savingKeys.isEmpty()
     SettingsScaffold(restartEnabled, onRestart) { padding ->
         val scrollFeedback = if (coui) Modifier.scrollEndHaptic() else Modifier
         Column(Modifier.padding(padding).consumeWindowInsets(padding)
@@ -226,20 +265,18 @@ private fun CoogleContent(
             val available = state.canChangeFeature(FeaturePolicy.NAVIGATION, true)
             val hey = state.features[FeaturePolicy.HEY_GOOGLE]
             Group("数字助理") {
-                SettingRow(0, 3, Icons.Rounded.RecordVoiceOver, "默认数字助理", state.assistant, onClick = onAssistant)
-                ToggleRow(1, 3, Icons.Rounded.Mic, "Hey Google", state.heyDescription,
+                SettingRow(0, 2, Icons.Rounded.RecordVoiceOver, "默认数字助理", state.assistant, onClick = onAssistant)
+                ToggleRow(1, 2, Icons.Rounded.Mic, "Hey Google", state.heyDescription,
                     checked = hey, enabled = state.canChangeFeature(FeaturePolicy.HEY_GOOGLE, hey != true),
                     onChange = { onSetting(FeaturePolicy.HEY_GOOGLE, it) }, saving = FeaturePolicy.HEY_GOOGLE in savingKeys)
-                ToggleRow(2, 3, ImageVector.vectorResource(R.drawable.action_lens_color), "Google智能镜头", "补全Google智能镜头功能",
-                    state.features[FeaturePolicy.LENS], available, { onSetting(FeaturePolicy.LENS, it) }, FeaturePolicy.LENS in savingKeys)
             }
             Group("系统设置") {
-                ToggleRow(0, 7, Icons.Rounded.TouchApp, "系统导航方式", state.navigationDescription,
+                SettingRow(0, 7, ImageVector.vectorResource(R.drawable.action_lens_color), LENS_SETTINGS_TITLE,
+                    "补全Google智能镜头的功能", onClick = onLensSettings)
+                ToggleRow(1, 7, Icons.Rounded.TouchApp, "系统导航方式", state.navigationDescription,
                     state.features[FeaturePolicy.NAVIGATION], available, { onSetting(FeaturePolicy.NAVIGATION, it) }, FeaturePolicy.NAVIGATION in savingKeys)
-                ToggleRow(1, 7, Icons.Rounded.Search, "Google搜索框", "在桌面底部显示 Google 搜索框",
+                ToggleRow(2, 7, Icons.Rounded.Search, "Google搜索框", "在桌面底部显示 Google 搜索框",
                     state.features[FeaturePolicy.SEARCH_BAR], available, { onSetting(FeaturePolicy.SEARCH_BAR, it) }, FeaturePolicy.SEARCH_BAR in savingKeys)
-                ToggleRow(2, 7, ControlIcons.ActionButton, "快捷键智能镜头", "将快捷键中AI拍一拍替换为智能镜头",
-                    state.features[FeaturePolicy.ACTION_BUTTON_LENS], available, { onSetting(FeaturePolicy.ACTION_BUTTON_LENS, it) }, FeaturePolicy.ACTION_BUTTON_LENS in savingKeys)
                 ToggleRow(3, 7, Icons.Rounded.AccountBalanceWallet, "Google钱包", "息屏时双击电源键呼出Google钱包",
                     state.features[FeaturePolicy.WALLET], available, { onSetting(FeaturePolicy.WALLET, it) }, FeaturePolicy.WALLET in savingKeys)
                 ToggleRow(4, 7, Icons.Rounded.DashboardCustomize, "快捷入口与控制中心", "补全锁屏快捷入口与下拉控制中心的原生开关",
@@ -258,11 +295,55 @@ private fun CoogleContent(
             Spacer(Modifier.height(24.dp))
         }
     }
-    CoogleDialog(state, savingKeys.isNotEmpty(), onDialogConfirm, onDialogDismiss)
 }
 
 @Composable
-private fun SettingsScaffold(restartEnabled: Boolean, onRestart: () -> Unit, content: @Composable (PaddingValues) -> Unit) {
+private fun LensSettingsContent(
+    state: CoogleState,
+    savingKeys: Set<String>,
+    onSetting: (String, Boolean) -> Unit,
+    restartEnabled: Boolean,
+    onRestart: () -> Unit,
+    onBack: () -> Unit
+) {
+    val scrollState = rememberScrollState()
+    val scrollFeedback = if (LocalUiStyle.current == UiStyle.COUI) Modifier.scrollEndHaptic() else Modifier
+    SettingsScaffold(restartEnabled, onRestart, onBack) { padding ->
+        Column(Modifier.padding(padding).consumeWindowInsets(padding)
+            .then(scrollFeedback).verticalScroll(scrollState).padding(horizontal = 16.dp)) {
+            Group(null) {
+                LensToggle(0, FeaturePolicy.LENS, ImageVector.vectorResource(R.drawable.lens_talk),
+                    "补全说话和创建", "启用智能镜头中的「说话」和「创建」",
+                    state, savingKeys, onSetting)
+                LensToggle(1, FeaturePolicy.ACTION_BUTTON_LENS, ControlIcons.ActionButton,
+                    "快捷键智能镜头", "将快捷键中的「AI 拍一拍」替换为智能镜头",
+                    state, savingKeys, onSetting)
+                LensToggle(2, FeaturePolicy.GALLERY_LENS, Icons.Rounded.PhotoLibrary,
+                    "相机相册智能镜头", "启用相机和相册的智能镜头",
+                    state, savingKeys, onSetting)
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun LensToggle(index: Int, key: String, icon: ImageVector, title: String, summary: String,
+    state: CoogleState, savingKeys: Set<String>, onSetting: (String, Boolean) -> Unit) {
+    val checked = state.features[key]
+    ToggleRow(index, 3, icon, title, summary, checked, state.canChangeFeature(key, checked != true),
+        { onSetting(key, it) }, key in savingKeys)
+}
+
+@Composable
+private fun SettingsScaffold(
+    restartEnabled: Boolean,
+    onRestart: () -> Unit,
+    onBack: (() -> Unit)? = null,
+    content: @Composable (PaddingValues) -> Unit
+) {
+    val title = if (onBack != null) LENS_SETTINGS_TITLE else "Coogle"
+    val subtitle = if (onBack != null) "" else "让国行版ColorOS更加Google"
     if (LocalUiStyle.current == UiStyle.COUI) {
         val bar = COUIScrollBehavior()
         CouiScaffold(
@@ -270,9 +351,14 @@ private fun SettingsScaffold(restartEnabled: Boolean, onRestart: () -> Unit, con
             contentWindowInsets = WindowInsets.safeDrawing,
             topBar = {
                 CouiTopAppBar(
-                    title = "Coogle",
-                    subtitle = "让国行版ColorOS更加Google",
+                    title = title,
+                    subtitle = subtitle,
                     scrollBehavior = bar,
+                    navigationIcon = {
+                        if (onBack != null) CouiIconButton(onClick = onBack) {
+                            CouiIcon(COUIIcons.Back, "返回", Modifier.size(24.dp))
+                        }
+                    },
                     actions = {
                         CouiIconButton(onClick = onRestart, enabled = restartEnabled) {
                             val colors = COUITheme.colorScheme
@@ -295,10 +381,18 @@ private fun SettingsScaffold(restartEnabled: Boolean, onRestart: () -> Unit, con
         topBar = {
             TwoRowsTopAppBar(
                 // Match KernelSU's LargeFlexibleTopAppBar title tokens.
-                title = { expanded -> Text("Coogle", style = if (expanded) MaterialTheme.typography.displaySmall else MaterialTheme.typography.titleLarge) },
-                subtitle = { expanded -> if (expanded) Text("让国行版ColorOS更加Google", style = MaterialTheme.typography.titleMedium) },
+                title = { expanded -> Text(title, style = if (expanded) MaterialTheme.typography.displaySmall else MaterialTheme.typography.titleLarge) },
+                subtitle = if (subtitle.isEmpty()) null else { expanded ->
+                    if (expanded) Text(subtitle, style = MaterialTheme.typography.titleMedium)
+                },
                 collapsedHeight = TopAppBarDefaults.LargeAppBarCollapsedHeight,
-                expandedHeight = TopAppBarDefaults.LargeFlexibleAppBarWithSubtitleExpandedHeight,
+                expandedHeight = if (onBack == null) TopAppBarDefaults.LargeFlexibleAppBarWithSubtitleExpandedHeight
+                    else TopAppBarDefaults.LargeAppBarExpandedHeight,
+                navigationIcon = {
+                    if (onBack != null) IconButton(onClick = onBack) {
+                        MaterialControlIcon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                    }
+                },
                 actions = {
                     IconButton(onClick = onRestart, enabled = restartEnabled) {
                         MaterialControlIcon(ControlIcons.Restart, "重启作用域", restartEnabled)
@@ -320,17 +414,17 @@ private fun MaterialControlIcon(vector: ImageVector, description: String? = null
 }
 
 @Composable
-private fun Group(title: String, content: @Composable () -> Unit) {
+private fun Group(title: String?, content: @Composable () -> Unit) {
     val coui = LocalUiStyle.current == UiStyle.COUI
     Column(Modifier.padding(top = if (coui) 16.dp else 24.dp)) {
         if (coui) {
             // The page already provides the outer 16 dp inset.
-            PreferenceCategory(title, marginStartType = PreferenceCategoryMarginStartType.Small)
+            if (title != null) PreferenceCategory(title, marginStartType = PreferenceCategoryMarginStartType.Small)
             CouiCard(modifier = Modifier.fillMaxWidth()) {
                 content()
             }
         } else {
-            Text(title, Modifier.padding(start = 16.dp, bottom = 8.dp),
+            if (title != null) Text(title, Modifier.padding(start = 16.dp, bottom = 8.dp),
                 style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) { content() }
         }
@@ -465,7 +559,7 @@ private fun CoogleDialog(current: CoogleState, saving: Boolean, onConfirm: () ->
         else -> "操作未完成"
     }
     val message = when (state.dialog) {
-        DialogKind.STATUS -> "在 LSPosed 中启用 Coogle 并勾选推荐作用域。更改设置后，重启对应作用域生效。\n\n附属模块提供 Google 系统应用、系统级 Voice Match 组件及圈定即搜实时翻译配置。\n\n${state.companionSummary}"
+        DialogKind.STATUS -> "在 LSPosed 中启用 Coogle 并勾选推荐作用域。更改设置后，重启对应作用域生效。\n\n附属模块提供 Google 系统应用、系统级 Voice Match 组件及圈定即搜实时翻译配置。"
         DialogKind.RESTART -> "重启目标作用域会关闭 LSPosed 中已勾选的应用，系统界面可能短暂重载。之后请重新打开对应应用。\n\n系统框架及 Hey Google 组件配置需要重启设备才能生效。操作会请求 Root 授权。"
         DialogKind.INSTALLED -> if (state.companion == CompanionState.DISABLED)
             "附属模块已安装，但尚未启用。请在 KernelSU 中启用附属模块后重启设备。"
